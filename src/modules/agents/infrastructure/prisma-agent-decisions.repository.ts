@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { AgentDecisionAction, AgentType, Prisma } from '@prisma/client';
+import { AgentDecisionAction, AgentExecutionSource, AgentType, Prisma } from '@prisma/client';
 import { PrismaService } from '@/database/prisma.service';
 import { AgentDecisionEntity } from '../domain/agent-decision.entity';
 import {
   AgentDecisionsRepository,
   CreateAgentDecisionData,
+  FindLatestAgentDecisionQuery,
 } from '../domain/agent-decisions.repository';
 
 @Injectable()
@@ -31,12 +32,30 @@ export class PrismaAgentDecisionsRepository implements AgentDecisionsRepository 
     return decision ? this.toEntity(decision) : null;
   }
 
+  async findLatest(query: FindLatestAgentDecisionQuery): Promise<AgentDecisionEntity | null> {
+    const decision = await this.prisma.agentDecision.findFirst({
+      where: {
+        agentType: query.agentType,
+        instrumentId: query.instrumentId,
+        metadata: query.timeframe
+          ? {
+              path: ['timeframe'],
+              equals: query.timeframe,
+            }
+          : undefined,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return decision ? this.toEntity(decision) : null;
+  }
+
   private toEntity(decision: {
     id: string;
     agentType: AgentType;
     instrumentId: string;
     signalId: string | null;
     decision: AgentDecisionAction;
+    executionSource: AgentExecutionSource;
     confidenceScore: number;
     reasoning: string | null;
     metadata: Prisma.JsonValue | null;
@@ -48,6 +67,7 @@ export class PrismaAgentDecisionsRepository implements AgentDecisionsRepository 
       decision.instrumentId,
       decision.signalId,
       decision.decision,
+      decision.executionSource,
       decision.confidenceScore,
       decision.reasoning,
       decision.metadata,

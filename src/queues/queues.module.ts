@@ -1,18 +1,23 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
+import { InstrumentsModule } from '@/modules/instruments/instruments.module';
 import { QUEUE_NAMES } from './queue.constants';
-import {
-  AgentDecisionProcessor,
-  MarketDataProcessor,
-  PaperTradingProcessor,
-  SignalGenerationProcessor,
-} from './processors';
+import { AgentDecisionProcessor, MarketDataProcessor } from './processors';
+import { QueuesController } from './queues.controller';
+import { RiskEvaluationQueueProducer } from './risk-evaluation-queue.producer';
+import { SignalGenerationQueueProducer } from './signal-generation-queue.producer';
+import { TechnicalAnalysisQueueProducer } from './technical-analysis-queue.producer';
+import { PaperTradingQueueProducer } from './paper-trading-queue.producer';
+import { SupervisorDecisionQueueProducer } from './supervisor-decision-queue.producer';
 
-const queueRegistrations = Object.values(QUEUE_NAMES).map((name) => BullModule.registerQueue({ name }));
+const queueRegistrations = Object.values(QUEUE_NAMES).map((name) =>
+  BullModule.registerQueue({ name }),
+);
 
 @Module({
   imports: [
+    InstrumentsModule,
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -25,12 +30,23 @@ const queueRegistrations = Object.values(QUEUE_NAMES).map((name) => BullModule.r
     }),
     ...queueRegistrations,
   ],
+  controllers: [QueuesController],
   providers: [
     MarketDataProcessor,
-    SignalGenerationProcessor,
     AgentDecisionProcessor,
-    PaperTradingProcessor,
+    RiskEvaluationQueueProducer,
+    SupervisorDecisionQueueProducer,
+    PaperTradingQueueProducer,
+    TechnicalAnalysisQueueProducer,
+    SignalGenerationQueueProducer,
   ],
-  exports: [BullModule],
+  exports: [
+    BullModule,
+    TechnicalAnalysisQueueProducer,
+    SignalGenerationQueueProducer,
+    RiskEvaluationQueueProducer,
+    SupervisorDecisionQueueProducer,
+    PaperTradingQueueProducer,
+  ],
 })
 export class QueuesModule {}

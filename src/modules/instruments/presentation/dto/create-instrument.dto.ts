@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MarketType } from '@prisma/client';
 import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
@@ -18,7 +18,7 @@ export class CreateInstrumentDto {
   @IsEnum(MarketType)
   marketType!: MarketType;
 
-  @ApiProperty({ example: 'XAUUSD', required: false })
+  @ApiPropertyOptional({ example: 'XAUUSD' })
   @IsOptional()
   @IsString()
   brokerSymbol?: string;

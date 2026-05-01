@@ -1,9 +1,12 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { SignalStatus } from '@prisma/client';
+import { InternalEventBus } from '@/events/internal-event-bus.service';
+import { TRADING_EVENTS } from '@/events/trading-events';
 import { TOKENS } from '@/shared/tokens';
 import {
   CreateTradingSignalData,
   FindSignalsQuery,
+  SignalCandleKey,
   TradingSignalsRepository,
 } from '../domain/trading-signals.repository';
 
@@ -12,14 +15,26 @@ export class SignalsService {
   constructor(
     @Inject(TOKENS.SIGNALS_REPOSITORY)
     private readonly signalsRepository: TradingSignalsRepository,
+    @Optional()
+    private readonly eventBus?: InternalEventBus,
   ) {}
 
-  create(data: CreateTradingSignalData) {
-    return this.signalsRepository.create(data);
+  async create(data: CreateTradingSignalData) {
+    const signal = await this.signalsRepository.create(data);
+    this.eventBus?.emit(TRADING_EVENTS.SIGNAL_CREATED, {
+      signalId: signal.id,
+      instrumentId: signal.instrumentId,
+      timeframe: signal.timeframe,
+    });
+    return signal;
   }
 
   findMany(query: FindSignalsQuery) {
     return this.signalsRepository.findMany(query);
+  }
+
+  findByCandleKey(key: SignalCandleKey) {
+    return this.signalsRepository.findByCandleKey(key);
   }
 
   async findById(id: string) {

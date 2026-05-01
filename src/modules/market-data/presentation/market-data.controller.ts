@@ -32,6 +32,8 @@ export class MarketDataController {
       timeframe: query.timeframe,
       from: query.from ? new Date(query.from) : undefined,
       to: query.to ? new Date(query.to) : undefined,
+      limit: query.limit,
+      order: query.order,
     });
   }
 }
