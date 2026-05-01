@@ -7,9 +7,14 @@ import { SignalsModule } from './modules/signals/signals.module';
 import { AgentsModule } from './modules/agents/agents.module';
 import { RiskModule } from './modules/risk/risk.module';
 import { PaperTradingModule } from './modules/paper-trading/paper-trading.module';
+import { StrategiesModule } from './modules/strategies/strategies.module';
+import { BacktestingModule } from './modules/backtesting/backtesting.module';
+import { SupervisorModule } from './modules/supervisor/supervisor.module';
+import { SystemModule } from './modules/system/system.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { QueuesModule } from './queues/queues.module';
+import { InternalEventsModule } from './events/internal-events.module';
 import configuration from './config/configuration';
 import { validateConfig } from './config/env.validation';
 
@@ -20,6 +25,7 @@ import { validateConfig } from './config/env.validation';
       load: [configuration],
       validate: validateConfig,
     }),
+    InternalEventsModule,
     DatabaseModule,
     QueuesModule,
     HealthModule,
@@ -27,8 +33,12 @@ import { validateConfig } from './config/env.validation';
     InstrumentsModule,
     MarketDataModule,
     SignalsModule,
+    StrategiesModule,
+    BacktestingModule,
+    SystemModule,
     AgentsModule,
     RiskModule,
+    SupervisorModule,
     PaperTradingModule,
   ],
 })

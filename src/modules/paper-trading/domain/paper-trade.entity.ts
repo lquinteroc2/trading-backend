@@ -1,8 +1,14 @@
-import { PaperTradeResult, PaperTradeStatus, TradeDirection } from '@prisma/client';
+import {
+  PaperTradeCloseReason,
+  PaperTradeResult,
+  PaperTradeStatus,
+  TradeDirection,
+} from '@prisma/client';
 
 export class PaperTradeEntity {
   constructor(
     public readonly id: string,
+    public readonly accountId: string,
     public readonly signalId: string | null,
     public readonly instrumentId: string,
     public readonly direction: TradeDirection,
@@ -17,5 +23,6 @@ export class PaperTradeEntity {
     public readonly pnl: number | null,
     public readonly pnlPercent: number | null,
     public readonly result: PaperTradeResult,
+    public readonly closeReason: PaperTradeCloseReason | null,
   ) {}
 }

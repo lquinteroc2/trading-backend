@@ -18,10 +18,13 @@ export type FindCandlesQuery = {
   timeframe?: Timeframe;
   from?: Date;
   to?: Date;
+  limit?: number;
+  order?: 'asc' | 'desc';
 };
 
 export interface MarketCandlesRepository {
   create(data: CreateMarketCandleData): Promise<MarketCandleEntity>;
   createMany(data: CreateMarketCandleData[]): Promise<{ count: number }>;
+  upsertManyCandles(data: CreateMarketCandleData[]): Promise<{ insertedCount: number }>;
   findMany(query: FindCandlesQuery): Promise<MarketCandleEntity[]>;
 }

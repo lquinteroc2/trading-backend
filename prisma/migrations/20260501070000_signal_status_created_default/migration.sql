@@ -1,0 +1,1 @@
+ALTER TABLE "TradingSignal" ALTER COLUMN "status" SET DEFAULT 'CREATED';

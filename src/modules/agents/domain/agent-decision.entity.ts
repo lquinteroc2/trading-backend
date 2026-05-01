@@ -1,4 +1,4 @@
-import { AgentDecisionAction, AgentType } from '@prisma/client';
+import { AgentDecisionAction, AgentExecutionSource, AgentType } from '@prisma/client';
 
 export class AgentDecisionEntity {
   constructor(
@@ -7,6 +7,7 @@ export class AgentDecisionEntity {
     public readonly instrumentId: string,
     public readonly signalId: string | null,
     public readonly decision: AgentDecisionAction,
+    public readonly executionSource: AgentExecutionSource,
     public readonly confidenceScore: number,
     public readonly reasoning: string | null,
     public readonly metadata: unknown,

@@ -1,4 +1,10 @@
-import { PrismaClient, MarketType, Role } from '@prisma/client';
+import {
+  PrismaClient,
+  MarketType,
+  PaperTradingAccountStatus,
+  Role,
+  StrategyStatus,
+} from '@prisma/client';
 import bcryptjs from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -16,12 +22,104 @@ async function main() {
 
   await prisma.instrument.createMany({
     data: [
-      { symbol: 'XAUUSD', name: 'Gold vs US Dollar', marketType: MarketType.COMMODITY, brokerSymbol: 'XAUUSD' },
-      { symbol: 'EURUSD', name: 'Euro vs US Dollar', marketType: MarketType.FOREX, brokerSymbol: 'EURUSD' },
-      { symbol: 'NAS100', name: 'Nasdaq 100 Index', marketType: MarketType.INDEX, brokerSymbol: 'NAS100' },
-      { symbol: 'BTCUSDT', name: 'Bitcoin vs Tether', marketType: MarketType.CRYPTO, brokerSymbol: 'BTCUSDT' },
+      {
+        symbol: 'XAUUSD',
+        name: 'Gold vs US Dollar',
+        marketType: MarketType.COMMODITY,
+        brokerSymbol: 'XAUUSD',
+      },
+      {
+        symbol: 'EURUSD',
+        name: 'Euro vs US Dollar',
+        marketType: MarketType.FOREX,
+        brokerSymbol: 'EURUSD',
+      },
+      {
+        symbol: 'NAS100',
+        name: 'Nasdaq 100 Index',
+        marketType: MarketType.INDEX,
+        brokerSymbol: 'NAS100',
+      },
+      {
+        symbol: 'BTCUSDT',
+        name: 'Bitcoin vs Tether',
+        marketType: MarketType.CRYPTO,
+        brokerSymbol: 'BTCUSDT',
+      },
     ],
     skipDuplicates: true,
+  });
+
+  const emaTrendStrategy = await prisma.strategy.upsert({
+    where: { name: 'EMA_TREND_STRATEGY' },
+    update: { status: StrategyStatus.ACTIVE },
+    create: {
+      id: 'ema-trend-strategy',
+      name: 'EMA_TREND_STRATEGY',
+      description: 'EMA alignment strategy with RSI confirmation and ATR-based exits.',
+      status: StrategyStatus.ACTIVE,
+    },
+  });
+
+  await prisma.strategyVersion.upsert({
+    where: {
+      strategyId_version: {
+        strategyId: emaTrendStrategy.id,
+        version: 'v1',
+      },
+    },
+    update: { isActive: true },
+    create: {
+      id: 'ema-trend-strategy-v1',
+      strategyId: emaTrendStrategy.id,
+      version: 'v1',
+      isActive: true,
+      parameters: {
+        rsiBuyMin: 45,
+        rsiBuyMax: 70,
+        rsiSellMin: 30,
+        rsiSellMax: 55,
+        atrStableMaxPercentOfPrice: 5,
+        trendConsistencyCandles: 3,
+      },
+    },
+  });
+
+  await prisma.riskProfile.upsert({
+    where: { name: 'DEFAULT_PROFILE' },
+    update: {
+      maxRiskPerTrade: 0.01,
+      maxDailyDrawdown: 0.02,
+      maxOpenTrades: 1,
+      minRiskRewardRatio: 2,
+      isActive: true,
+    },
+    create: {
+      id: 'default-risk-profile',
+      name: 'DEFAULT_PROFILE',
+      maxRiskPerTrade: 0.01,
+      maxDailyDrawdown: 0.02,
+      maxOpenTrades: 1,
+      minRiskRewardRatio: 2,
+      isActive: true,
+    },
+  });
+
+  const defaultPaperBalance = Number(process.env.PAPER_TRADING_DEFAULT_BALANCE ?? 10000);
+  await prisma.paperTradingAccount.upsert({
+    where: { name: 'DEFAULT_PAPER_ACCOUNT' },
+    update: {
+      status: PaperTradingAccountStatus.ACTIVE,
+    },
+    create: {
+      id: 'default-paper-account',
+      name: 'DEFAULT_PAPER_ACCOUNT',
+      initialBalance: defaultPaperBalance,
+      balance: defaultPaperBalance,
+      equity: defaultPaperBalance,
+      currency: 'USD',
+      status: PaperTradingAccountStatus.ACTIVE,
+    },
   });
 }
 
