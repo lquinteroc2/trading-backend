@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: trading-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trading
+      POSTGRES_PASSWORD: trading
+      POSTGRES_DB: trading
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trading -d trading"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: trading-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: trading-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${PORT:-3000}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://trading:trading@postgres:5432/trading?schema=public}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@trading.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
