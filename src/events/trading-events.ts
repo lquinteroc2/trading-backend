@@ -1,4 +1,4 @@
-import { Timeframe } from '@prisma/client';
+import { RiskAssessmentDecision, Timeframe } from '@prisma/client';
 
 export const TRADING_EVENTS = {
   CANDLE_CREATED: 'CANDLE_CREATED',
@@ -6,6 +6,7 @@ export const TRADING_EVENTS = {
   TECHNICAL_ANALYSIS_COMPLETED: 'TECHNICAL_ANALYSIS_COMPLETED',
   SIGNAL_CREATED: 'SIGNAL_CREATED',
   RISK_APPROVED: 'RISK_APPROVED',
+  RISK_EVALUATED: 'RISK_EVALUATED',
 } as const;
 
 export type CandleClosedEvent = {
@@ -34,4 +35,9 @@ export type RiskApprovedEvent = {
   signalId: string;
   instrumentId: string;
   agentDecisionId: string;
+};
+
+export type RiskEvaluatedEvent = RiskApprovedEvent & {
+  assessmentId: string;
+  decision: RiskAssessmentDecision;
 };

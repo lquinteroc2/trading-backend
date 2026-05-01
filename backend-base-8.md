@@ -1,318 +1,312 @@
-Actúa como arquitecto senior backend y quant engineer experto en NestJS, arquitectura hexagonal, PostgreSQL, Prisma, BullMQ, Redis, trading algorítmico y simulación de ejecución.
+Actúa como arquitecto senior backend y quant engineer experto en NestJS, arquitectura hexagonal, sistemas event-driven, BullMQ, PostgreSQL, Prisma y diseño de sistemas de trading automatizado.
 
 Ya completé:
-- Sprint 1: dominio base, candles, signals, agents, risk base, paper trading base.
-- Sprint 2: ingesta histórica Binance.
-- Sprint 3: worker Python de análisis técnico.
-- Sprint 4: cola de análisis técnico.
-- Sprint 5: generación de señales EMA Trend Strategy.
-- Sprint 6: backtesting engine.
-- Sprint 7: Risk Agent con evaluación de señales y agent_decisions tipo RISK.
 
-OBJETIVO DEL SPRINT 8
+SPRINT 1:
+- Dominio base (candles, signals, agents, etc).
 
-Implementar el Paper Trading Engine completo.
+SPRINT 2:
+- Ingesta de datos históricos.
 
-El sistema debe:
-1. Crear una cuenta simulada.
-2. Ejecutar señales aprobadas por riesgo como trades simulados.
-3. Monitorear nuevas velas.
-4. Cerrar trades si toca Stop Loss o Take Profit.
-5. Calcular PnL.
-6. Actualizar balance/equity.
-7. Registrar todo de forma auditable.
+SPRINT 3:
+- Worker Python de análisis técnico.
 
-Este sprint NO debe:
-- Conectarse a broker real.
-- Ejecutar órdenes reales.
-- Implementar supervisor final todavía.
-- Implementar dashboard.
-- Implementar IA.
+SPRINT 4:
+- Cola de análisis técnico.
+
+SPRINT 5:
+- StrategyEngine y generación de señales.
+
+SPRINT 6:
+- Backtesting engine.
+
+SPRINT 7:
+- Risk Agent.
+
+SPRINT 8:
+- Paper Trading Engine (cuenta simulada, trades, pnl, cierre por SL/TP).
+
+OBJETIVO DEL SPRINT 9
+
+Implementar el Agente Supervisor.
+
+Este agente es el responsable de:
+1. Tomar la decisión final de operar o no.
+2. Recibir:
+   - Señal (strategy)
+   - Evaluación de riesgo
+   - Estado de cuenta
+3. Decidir:
+   - OPERATE
+   - WAIT
+   - BLOCK
+4. Controlar condiciones globales del sistema.
+
+IMPORTANTE:
+Ningún trade simulado debe ejecutarse sin aprobación del Supervisor.
 
 ARQUITECTURA OBJETIVO
 
-signal APPROVED by risk →
-paper trading engine →
-open simulated trade →
-new candles →
-check SL/TP →
-close trade →
-update account balance →
-persist result
+signal →
+risk evaluation →
+supervisor →
+decision →
+paper trading (solo si OPERATE)
+
+PRINCIPIOS CLAVE
+
+1. El supervisor NO genera señales.
+2. El supervisor NO calcula indicadores.
+3. Solo toma decisiones basadas en inputs existentes.
+4. Debe ser explicable.
+5. Debe ser configurable.
+6. Debe registrar TODAS sus decisiones.
 
 MÓDULOS A IMPLEMENTAR
 
-1. PaperTradingAccount Entity
+1. Supervisor Decision Entity
 
-Crear o mejorar:
+Crear:
 
-PaperTradingAccount:
+SupervisorDecision:
 - id
-- name
-- initialBalance
-- balance
-- equity
-- currency: USD
-- status: ACTIVE | INACTIVE
-- createdAt
-- updatedAt
-
-Seed:
-- DEFAULT_PAPER_ACCOUNT
-- initialBalance: 10000
-
-2. PaperTrade Entity
-
-Crear o mejorar:
-
-PaperTrade:
-- id
-- accountId
 - signalId
-- instrumentId
-- direction: BUY | SELL
+- decision: OPERATE | WAIT | BLOCK
+- reason
+- confidence
+- metadata JSON
+- createdAt
+
+También persistir en agent_decisions con:
+- agentType: SUPERVISOR
+
+2. SupervisorAgentService
+
+Crear servicio:
+
+SupervisorAgentService
+
+Método principal:
+
+decide(signal, riskDecision, accountState)
+
+3. Inputs del Supervisor
+
+Signal:
+- direction
+- confidence
 - entryPrice
 - stopLoss
 - takeProfit
+
+RiskDecision:
+- decision (APPROVED / REJECTED)
 - positionSize
-- openedAt
-- closedAt
-- closePrice
-- pnl
-- pnlPercent
-- result: WIN | LOSS | BREAKEVEN | OPEN
-- status: OPEN | CLOSED | CANCELLED
-- closeReason: STOP_LOSS | TAKE_PROFIT | MANUAL | SYSTEM
+- riskRewardRatio
 
-3. PaperTradingEngineService
+AccountState:
+- balance
+- equity
+- openTrades
+- dailyPnL
 
-Crear servicio principal:
+4. Reglas del Supervisor
 
-PaperTradingEngineService
+OPERATE solo si:
 
-Métodos:
-- openTradeFromSignal(signalId)
-- closeTrade(tradeId, closePrice, closeReason)
-- evaluateOpenTradesOnCandle(candle)
-- recalculateAccountEquity(accountId)
+- signal.confidence >= 70
+- riskDecision = APPROVED
+- no existe trade abierto en el mismo symbol
+- openTrades < maxOpenTrades
+- sistema en modo PAPER_TRADING
+- no se ha alcanzado maxDailyDrawdown
 
-4. Reglas para abrir trade
+WAIT si:
+- señal válida pero no óptima
+- confidence entre 50 y 69
+- mercado dudoso
 
-Solo abrir trade si:
-- signal existe
-- signal.status es APPROVED o UNDER_REVIEW con risk approval
-- existe Risk AgentDecision APPROVED para signalId
-- no existe trade abierto para el mismo instrumentId
-- cuenta paper activa
-- positionSize válido
-- entryPrice, SL y TP válidos
+BLOCK si:
+- riskDecision = REJECTED
+- confidence < 50
+- ya hay trade abierto en ese símbolo
+- drawdown diario excedido
+- sistema en modo SAFE o PAUSED
 
-Al abrir:
-- crear PaperTrade en status OPEN
-- usar positionSize de RiskAssessment / metadata del agent_decision RISK
-- entryPrice = signal.entryPrice
-- openedAt = now
-- no modificar balance todavía, solo equity si aplica
+5. System Mode
 
-5. Reglas para cerrar trade por vela
+Crear configuración global:
 
-Para cada nueva vela:
+SystemMode:
+- PAPER_TRADING
+- SAFE_MODE
+- PAUSED
 
-Si trade BUY:
-- Si candle.low <= stopLoss → cerrar en stopLoss con LOSS
-- Si candle.high >= takeProfit → cerrar en takeProfit con WIN
+Crear tabla o config:
 
-Si trade SELL:
-- Si candle.high >= stopLoss → cerrar en stopLoss con LOSS
-- Si candle.low <= takeProfit → cerrar en takeProfit con WIN
+SystemConfig:
+- mode
+- killSwitch: boolean
 
-Orden conservador:
-- evaluar STOP_LOSS antes que TAKE_PROFIT si ambos ocurren en la misma vela.
+Reglas:
+- Si killSwitch = true → BLOCK todo
+- Si mode != PAPER_TRADING → no ejecutar trades
 
-6. Cálculo PnL
+6. Integración con flujo
 
-BUY:
-pnl = (closePrice - entryPrice) * positionSize
+Trigger:
 
-SELL:
-pnl = (entryPrice - closePrice) * positionSize
+Cuando:
+→ existe Signal
+→ existe RiskDecision APPROVED o REJECTED
 
-pnlPercent:
-pnl / account.balance antes del cierre
+Entonces:
+→ ejecutar SupervisorAgent
 
-Al cerrar:
-- actualizar account.balance = account.balance + pnl
-- actualizar equity
-- guardar result
+Opciones:
 
-7. Integración con eventos/colas
-
-Cuando se crea una nueva señal y riesgo aprueba:
+A. Directo
+B. Cola (recomendado)
 
 Crear cola:
-paper-trading-queue
 
-Jobs:
-- paper-trade.open
-- paper-trade.evaluate-open-trades
+supervisor-decision-queue
 
-Payload open:
+Job:
+supervisor.decide
+
+Payload:
 {
-  "signalId": "uuid",
-  "accountId": "uuid"
+  "signalId": "uuid"
 }
 
-Payload evaluate:
-{
-  "candleId": "uuid"
-}
+Processor:
+1. obtener signal
+2. obtener risk decision
+3. obtener account state
+4. ejecutar SupervisorAgent
+5. guardar decision
+6. si decision = OPERATE → encolar paper trade
 
-Cuando llega CANDLE_CLOSED:
-- encolar evaluate-open-trades para esa vela.
+7. Integración con Paper Trading
+
+Solo si:
+
+decision == OPERATE
+
+→ encolar:
+
+paper-trade.open
+
+IMPORTANTE:
+Eliminar cualquier apertura directa de trades desde signals o risk.
+
+TODO trade debe pasar por Supervisor.
 
 8. Endpoints
 
-POST /paper-trading/accounts
-GET /paper-trading/accounts
-GET /paper-trading/accounts/:id
+POST /agents/supervisor/decide
 
-POST /paper-trading/trades/open
 Body:
 {
-  "signalId": "uuid",
-  "accountId": "uuid"
+  "signalId": "uuid"
 }
 
-PATCH /paper-trading/trades/:id/close
+GET /agents/supervisor/decisions
+
+GET /agents/supervisor/decisions/:id
+
+GET /system/config
+
+PATCH /system/config
+
 Body:
 {
-  "closePrice": 65000,
-  "closeReason": "MANUAL"
+  "mode": "PAPER_TRADING",
+  "killSwitch": false
 }
 
-GET /paper-trading/trades
-Query:
-- accountId
-- instrumentId
-- status
-- result
-- from
-- to
+9. Validaciones
 
-GET /paper-trading/trades/:id
+- signal debe existir
+- riskDecision debe existir
+- no duplicar decisiones para mismo signal
+- no ejecutar si killSwitch activo
 
-POST /paper-trading/evaluate-candle
-Body:
-{
-  "candleId": "uuid"
-}
+10. Logging
 
-9. Auditoría
-
-Cada apertura y cierre debe crear log estructurado:
+Registrar:
 
 {
-  "event": "paper_trade_opened",
+  "event": "supervisor_decision",
   "signalId": "...",
-  "tradeId": "...",
-  "entryPrice": 65000,
-  "positionSize": 0.12
+  "decision": "OPERATE",
+  "confidence": 82,
+  "reason": "All conditions satisfied"
 }
-
-{
-  "event": "paper_trade_closed",
-  "tradeId": "...",
-  "result": "WIN",
-  "pnl": 250,
-  "balanceAfter": 10250
-}
-
-10. Validaciones
-
-- No abrir trade duplicado para mismo signalId.
-- No abrir más de un trade abierto por instrumentId.
-- No cerrar trade ya cerrado.
-- No cerrar con precio inválido.
-- No abrir si falta risk approval.
-- No abrir si no hay cuenta activa.
 
 11. Tests
 
-Crear tests para:
+Supervisor rules:
+- aprueba operación válida
+- bloquea si riesgo rechazado
+- bloquea si ya hay trade abierto
+- bloquea si killSwitch activo
+- espera si confidence media
 
-PaperTradingEngine:
-- abre trade correctamente
-- no abre trade sin risk approval
-- no abre trade duplicado
-- cierra BUY por SL
-- cierra BUY por TP
-- cierra SELL por SL
-- cierra SELL por TP
-- calcula PnL correctamente
-- actualiza balance correctamente
-
-Processor:
-- paper-trade.open procesa job
-- evaluate-open-trades cierra trades según vela
-
-Controller:
-- endpoints validan DTOs
-- endpoints devuelven respuesta correcta
+Integration:
+- signal → risk → supervisor → paper trade
 
 12. Config
 
-Agregar .env:
+.env:
 
-PAPER_TRADING_DEFAULT_BALANCE=10000
-PAPER_TRADING_MAX_OPEN_TRADES_PER_SYMBOL=1
-PAPER_TRADING_ENABLED=true
+SUPERVISOR_MIN_CONFIDENCE=70
+SUPERVISOR_MAX_OPEN_TRADES=1
+SUPERVISOR_MAX_DRAWDOWN=0.02
 
 13. README
 
-Actualizar README con:
+Agregar:
 
-- cómo crear cuenta paper
-- cómo abrir trade desde una señal aprobada
-- cómo evaluar trades con una vela
-- cómo consultar balance
-- cómo revisar trades abiertos/cerrados
+- flujo completo actualizado
+- explicación del supervisor
+- ejemplos:
+  - señal aprobada
+  - señal bloqueada
+- cómo activar kill switch
+- cómo probar flujo completo
 
 CRITERIOS DE ACEPTACIÓN
 
-Sprint 8 completo cuando:
+Sprint 9 completo cuando:
 
-1. Existe cuenta paper trading.
-2. Se puede abrir trade simulado desde una señal aprobada por riesgo.
-3. Se rechaza apertura sin aprobación de riesgo.
-4. Se evita trade duplicado.
-5. Nueva vela evalúa trades abiertos.
-6. Trades cierran por SL/TP.
-7. PnL se calcula correctamente.
-8. Balance se actualiza correctamente.
-9. Todo queda persistido.
-10. Cola paper-trading-queue funciona.
-11. Tests pasan.
-12. No hay ejecución real.
+1. Existe SupervisorAgentService.
+2. Se toman decisiones OPERATE / WAIT / BLOCK.
+3. No se ejecuta trade sin supervisor.
+4. Kill switch funciona.
+5. System mode funciona.
+6. Se registra decisión en DB.
+7. Se integra con paper trading.
+8. Tests pasan.
 
 NO HACER
 
 No implementar:
 - broker real
-- live trading
-- supervisor agent completo
-- dashboard
 - IA
+- dashboard
 - WebSockets
 - MT5
+- live trading
 
 ENTREGABLE FINAL
 
-Implementa el Paper Trading Engine completo.
+Implementa el Supervisor Agent completo.
 
 Luego explícame:
 
-1. Cómo fluye signal → risk approval → paper trade.
-2. Cómo se abre una operación simulada.
-3. Cómo se cierra por SL/TP.
-4. Cómo se calcula PnL y balance.
-5. Qué queda listo para Sprint 9.
+1. Cómo fluye signal → risk → supervisor → trade.
+2. Cómo probar un flujo completo.
+3. Cómo bloquear todo el sistema con kill switch.
+4. Qué queda listo para Sprint 10 (dashboard).

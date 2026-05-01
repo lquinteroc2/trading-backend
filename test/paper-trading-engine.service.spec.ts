@@ -104,18 +104,34 @@ function makeEngine(overrides: Record<string, unknown> = {}) {
   };
   const prisma = {
     agentDecision: {
-      findFirst: jest.fn(async () => ({
-        id: 'risk-decision-1',
-        agentType: AgentType.RISK,
-        instrumentId: signal.instrumentId,
-        signalId: signal.id,
-        decision: AgentDecisionAction.APPROVE,
-        executionSource: AgentExecutionSource.QUEUE,
-        confidenceScore: 100,
-        reasoning: 'approved',
-        metadata: { positionSize: 2 },
-        createdAt: new Date('2026-05-01T00:00:00.000Z'),
-      })),
+      findFirst: jest.fn(async ({ where }) => {
+        if (where.agentType === AgentType.SUPERVISOR) {
+          return {
+            id: 'supervisor-decision-1',
+            agentType: AgentType.SUPERVISOR,
+            instrumentId: signal.instrumentId,
+            signalId: signal.id,
+            decision: AgentDecisionAction.APPROVE,
+            executionSource: AgentExecutionSource.QUEUE,
+            confidenceScore: 90,
+            reasoning: 'approved',
+            metadata: {},
+            createdAt: new Date('2026-05-01T00:00:00.000Z'),
+          };
+        }
+        return {
+          id: 'risk-decision-1',
+          agentType: AgentType.RISK,
+          instrumentId: signal.instrumentId,
+          signalId: signal.id,
+          decision: AgentDecisionAction.APPROVE,
+          executionSource: AgentExecutionSource.QUEUE,
+          confidenceScore: 100,
+          reasoning: 'approved',
+          metadata: { positionSize: 2 },
+          createdAt: new Date('2026-05-01T00:00:00.000Z'),
+        };
+      }),
     },
     riskAssessment: { findFirst: jest.fn() },
     marketCandle: { findUnique: jest.fn() },
@@ -157,7 +173,39 @@ describe('PaperTradingEngineService', () => {
 
   it('does not open a trade without risk approval', async () => {
     const { engine } = makeEngine({
-      prisma: { agentDecision: { findFirst: jest.fn(async () => null) } },
+      prisma: {
+        agentDecision: {
+          findFirst: jest.fn(async ({ where }) =>
+            where.agentType === AgentType.RISK
+              ? null
+              : {
+                  id: 'supervisor-decision-1',
+                  metadata: {},
+                },
+          ),
+        },
+      },
+    });
+
+    await expect(engine.openTradeFromSignal(signal.id, account.id)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('does not open a trade without supervisor approval', async () => {
+    const { engine } = makeEngine({
+      prisma: {
+        agentDecision: {
+          findFirst: jest.fn(async ({ where }) =>
+            where.agentType === AgentType.SUPERVISOR
+              ? null
+              : {
+                  id: 'risk-decision-1',
+                  metadata: { positionSize: 2 },
+                },
+          ),
+        },
+      },
     });
 
     await expect(engine.openTradeFromSignal(signal.id, account.id)).rejects.toBeInstanceOf(

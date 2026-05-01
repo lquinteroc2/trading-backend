@@ -5,6 +5,7 @@ export const QUEUE_NAMES = {
   AGENT_DECISION: 'agent-decision-queue',
   TECHNICAL_ANALYSIS: 'technical-analysis-queue',
   RISK_EVALUATION: 'risk-evaluation-queue',
+  SUPERVISOR_DECISION: 'supervisor-decision-queue',
   PAPER_TRADING: 'paper-trading-queue',
 } as const;
 
@@ -13,6 +14,7 @@ export const QUEUE_JOBS = {
   TECHNICAL_ANALYSIS_ANALYZE: 'technical-analysis.analyze',
   SIGNAL_GENERATE: 'signal.generate',
   RISK_EVALUATE: 'risk.evaluate',
+  SUPERVISOR_DECIDE: 'supervisor.decide',
   PAPER_TRADE_OPEN: 'paper-trade.open',
   PAPER_TRADE_EVALUATE_OPEN_TRADES: 'paper-trade.evaluate-open-trades',
 } as const;

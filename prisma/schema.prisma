@@ -129,6 +129,18 @@ enum RiskAssessmentDecision {
   ADJUSTED
 }
 
+enum SupervisorDecisionAction {
+  OPERATE
+  WAIT
+  BLOCK
+}
+
+enum SystemMode {
+  PAPER_TRADING
+  SAFE_MODE
+  PAUSED
+}
+
 enum DataSyncStatus {
   PENDING
   RUNNING
@@ -228,6 +240,7 @@ model TradingSignal {
   decisions       AgentDecision[]
   paperTrades     PaperTrade[]
   riskAssessments RiskAssessment[]
+  supervisorDecision SupervisorDecision?
 
   @@unique([instrumentId, timeframe, candleTimestamp])
   @@index([instrumentId, status, createdAt])
@@ -307,6 +320,27 @@ model RiskAssessment {
   @@index([signalId, createdAt])
   @@index([riskProfileId, createdAt])
   @@index([decision, createdAt])
+}
+
+model SupervisorDecision {
+  id              String                   @id @default(uuid())
+  signalId        String                   @unique
+  decision        SupervisorDecisionAction
+  reason          String
+  confidenceScore Int
+  metadata        Json?
+  createdAt       DateTime                 @default(now())
+  signal          TradingSignal            @relation(fields: [signalId], references: [id])
+
+  @@index([decision, createdAt])
+}
+
+model SystemConfig {
+  id         String     @id
+  mode       SystemMode @default(PAPER_TRADING)
+  killSwitch Boolean    @default(false)
+  updatedAt  DateTime   @updatedAt
+  createdAt  DateTime   @default(now())
 }
 
 model PaperTradingAccount {

@@ -130,6 +130,25 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   PAPER_TRADING_QUEUE_CONCURRENCY?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  SUPERVISOR_MIN_CONFIDENCE?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  SUPERVISOR_MAX_OPEN_TRADES?: number;
+
+  @IsOptional()
+  @Min(0)
+  SUPERVISOR_MAX_DRAWDOWN?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  SUPERVISOR_DECISION_QUEUE_CONCURRENCY?: number;
 }
 
 export function validateConfig(config: Record<string, unknown>) {

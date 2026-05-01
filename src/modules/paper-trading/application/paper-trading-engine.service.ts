@@ -118,6 +118,11 @@ export class PaperTradingEngineService {
       throw new BadRequestException('Signal has no approved Risk AgentDecision');
     }
 
+    const supervisorDecision = await this.findSupervisorApproval(signal.id);
+    if (!supervisorDecision) {
+      throw new BadRequestException('Signal has no approved Supervisor AgentDecision');
+    }
+
     const positionSize = await this.resolvePositionSize(signal.id, riskDecision.metadata);
     if (!this.isPositive(positionSize)) {
       throw new BadRequestException('Risk approval has invalid position size');
@@ -270,6 +275,17 @@ export class PaperTradingEngineService {
       where: {
         signalId,
         agentType: AgentType.RISK,
+        decision: AgentDecisionAction.APPROVE,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  private async findSupervisorApproval(signalId: string) {
+    return this.prisma.agentDecision.findFirst({
+      where: {
+        signalId,
+        agentType: AgentType.SUPERVISOR,
         decision: AgentDecisionAction.APPROVE,
       },
       orderBy: { createdAt: 'desc' },

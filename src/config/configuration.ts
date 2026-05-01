@@ -47,4 +47,10 @@ export default () => ({
       10,
     ),
   },
+  supervisor: {
+    minConfidence: parseInt(process.env.SUPERVISOR_MIN_CONFIDENCE ?? '70', 10),
+    maxOpenTrades: parseInt(process.env.SUPERVISOR_MAX_OPEN_TRADES ?? '1', 10),
+    maxDailyDrawdown: parseFloat(process.env.SUPERVISOR_MAX_DRAWDOWN ?? '0.02'),
+    queueConcurrency: parseInt(process.env.SUPERVISOR_DECISION_QUEUE_CONCURRENCY ?? '5', 10),
+  },
 });

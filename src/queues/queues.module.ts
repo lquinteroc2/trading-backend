@@ -9,6 +9,7 @@ import { RiskEvaluationQueueProducer } from './risk-evaluation-queue.producer';
 import { SignalGenerationQueueProducer } from './signal-generation-queue.producer';
 import { TechnicalAnalysisQueueProducer } from './technical-analysis-queue.producer';
 import { PaperTradingQueueProducer } from './paper-trading-queue.producer';
+import { SupervisorDecisionQueueProducer } from './supervisor-decision-queue.producer';
 
 const queueRegistrations = Object.values(QUEUE_NAMES).map((name) =>
   BullModule.registerQueue({ name }),
@@ -34,6 +35,7 @@ const queueRegistrations = Object.values(QUEUE_NAMES).map((name) =>
     MarketDataProcessor,
     AgentDecisionProcessor,
     RiskEvaluationQueueProducer,
+    SupervisorDecisionQueueProducer,
     PaperTradingQueueProducer,
     TechnicalAnalysisQueueProducer,
     SignalGenerationQueueProducer,
@@ -43,6 +45,7 @@ const queueRegistrations = Object.values(QUEUE_NAMES).map((name) =>
     TechnicalAnalysisQueueProducer,
     SignalGenerationQueueProducer,
     RiskEvaluationQueueProducer,
+    SupervisorDecisionQueueProducer,
     PaperTradingQueueProducer,
   ],
 })

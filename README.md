@@ -566,6 +566,80 @@ El PnL se calcula como `(closePrice - entryPrice) * positionSize` en BUY y
 con `balance + pnl` y se registra auditoria estructurada en logs (`paper_trade_opened` y
 `paper_trade_closed`).
 
+### Sprint 9: Supervisor Agent
+
+El flujo automatico queda:
+
+```text
+signal -> risk evaluation -> supervisor decision -> paper trade
+```
+
+El Risk Agent ya no abre trades directamente. Cuando termina una evaluacion de riesgo emite
+`RISK_EVALUATED`, se encola `supervisor.decide` en `supervisor-decision-queue`, el Supervisor registra
+su decision en `SupervisorDecision` y tambien en `AgentDecision` con `agentType = SUPERVISOR`.
+Solo si la decision final es `OPERATE`, se encola `paper-trade.open`.
+
+Reglas principales del Supervisor:
+
+- `OPERATE`: confianza >= `SUPERVISOR_MIN_CONFIDENCE`, riesgo aprobado, modo `PAPER_TRADING`, sin kill switch, sin trade abierto del mismo instrumento, `openTrades < SUPERVISOR_MAX_OPEN_TRADES` y drawdown diario bajo el limite.
+- `WAIT`: senal valida con confianza media, por defecto entre 50 y 69.
+- `BLOCK`: riesgo rechazado, confianza menor a 50, kill switch activo, modo `SAFE_MODE`/`PAUSED`, trade abierto del mismo instrumento o drawdown diario excedido.
+
+Variables:
+
+```env
+SUPERVISOR_MIN_CONFIDENCE=70
+SUPERVISOR_MAX_OPEN_TRADES=1
+SUPERVISOR_MAX_DRAWDOWN=0.02
+SUPERVISOR_DECISION_QUEUE_CONCURRENCY=5
+```
+
+Endpoints:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/agents/supervisor/decide \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{"signalId":"SIGNAL_ID"}'
+
+curl http://localhost:3000/api/v1/agents/supervisor/decisions \
+  -H "Authorization: Bearer TOKEN"
+
+curl http://localhost:3000/api/v1/agents/supervisor/decisions/SUPERVISOR_DECISION_ID \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Config global del sistema:
+
+```bash
+curl http://localhost:3000/api/v1/system/config \
+  -H "Authorization: Bearer TOKEN"
+
+curl -X PATCH http://localhost:3000/api/v1/system/config \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{"mode":"PAPER_TRADING","killSwitch":false}'
+```
+
+Para bloquear todo el sistema:
+
+```bash
+curl -X PATCH http://localhost:3000/api/v1/system/config \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{"killSwitch":true}'
+```
+
+Con `killSwitch = true` el Supervisor responde `BLOCK` para toda senal. Con `mode = SAFE_MODE` o
+`mode = PAUSED` tampoco se abren trades.
+
+Para probar el flujo completo:
+
+1. Crear o sincronizar velas hasta disparar `SIGNAL_CREATED`.
+2. Verificar que el Risk Agent cree un `RiskAssessment`.
+3. Consultar `GET /agents/supervisor/decisions` y confirmar `OPERATE`, `WAIT` o `BLOCK`.
+4. Si fue `OPERATE`, consultar `GET /paper-trading/trades?signalId=SIGNAL_ID`.
+
 ## Estructura
 
 ```text
@@ -586,6 +660,8 @@ src/
     strategies/
     agents/
     risk/
+    supervisor/
+    system/
     paper-trading/
 ```
 
@@ -596,9 +672,10 @@ Cada modulo de negocio separa:
 - `infrastructure`: adaptadores concretos, por ahora Prisma.
 - `presentation`: controllers y DTOs HTTP.
 
-## Listo para Sprint 9
+## Listo para Sprint 10
 
-- Agregar supervisor final que coordine technical/risk/paper trading.
 - Definir politicas de portfolio sobre multiples instrumentos y cuentas.
 - Exponer metricas agregadas de cuenta/trades para dashboard.
+- Mostrar decisiones de Technical/Risk/Supervisor y razonamiento por senal.
+- Agregar controles visuales para `SystemConfig`, kill switch y estado de colas.
 - Preparar integracion sandbox con broker sin tocar ejecucion real todavia.

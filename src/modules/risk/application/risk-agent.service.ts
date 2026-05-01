@@ -140,6 +140,14 @@ export class RiskAgentService {
       decision === RiskAssessmentDecision.APPROVED ? SignalStatus.APPROVED : SignalStatus.REJECTED,
     );
 
+    this.eventBus?.emit(TRADING_EVENTS.RISK_EVALUATED, {
+      signalId: signal.id,
+      instrumentId: signal.instrumentId,
+      agentDecisionId: agentDecision.id,
+      assessmentId: assessment.id,
+      decision,
+    });
+
     if (decision === RiskAssessmentDecision.APPROVED) {
       this.eventBus?.emit(TRADING_EVENTS.RISK_APPROVED, {
         signalId: signal.id,

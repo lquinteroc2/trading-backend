@@ -2,7 +2,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { InternalEventBus } from '@/events/internal-event-bus.service';
-import { CandleClosedEvent, RiskApprovedEvent, TRADING_EVENTS } from '@/events/trading-events';
+import { CandleClosedEvent, TRADING_EVENTS } from '@/events/trading-events';
 import { QUEUE_JOBS, QUEUE_NAMES } from './queue.constants';
 import {
   PaperTradeEvaluateOpenTradesJobPayload,
@@ -21,9 +21,6 @@ export class PaperTradingQueueProducer implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.eventBus.on<RiskApprovedEvent>(TRADING_EVENTS.RISK_APPROVED, async (event) => {
-      await this.enqueueOpenTrade({ signalId: event.signalId });
-    });
     this.eventBus.on<CandleClosedEvent>(TRADING_EVENTS.CANDLE_CLOSED, async (event) => {
       if (!event.candleId) {
         return;
