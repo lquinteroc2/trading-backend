@@ -30,6 +30,28 @@ class EnvironmentVariables {
   @IsOptional()
   @IsInt()
   REDIS_PORT?: number;
+
+  @IsOptional()
+  @IsString()
+  REDIS_PASSWORD?: string;
+
+  @IsOptional()
+  @IsString()
+  BINANCE_API_BASE_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  MARKET_DATA_DEFAULT_PROVIDER?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  MARKET_DATA_SYNC_DEFAULT_LIMIT?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  MARKET_DATA_SYNC_MAX_LIMIT?: number;
 }
 
 export function validateConfig(config: Record<string, unknown>) {

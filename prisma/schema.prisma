@@ -86,6 +86,13 @@ enum PaperTradeResult {
   OPEN
 }
 
+enum DataSyncStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -106,6 +113,7 @@ model Instrument {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   candles       MarketCandle[]
+  syncJobs      MarketDataSyncJob[]
   signals       TradingSignal[]
   decisions     AgentDecision[]
   paperTrades   PaperTrade[]
@@ -129,6 +137,29 @@ model MarketCandle {
 
   @@unique([instrumentId, timeframe, timestamp])
   @@index([instrumentId, timeframe, timestamp])
+}
+
+model MarketDataSyncJob {
+  id                String         @id @default(uuid())
+  provider          String
+  instrumentId      String
+  symbol            String
+  timeframe         Timeframe
+  startTime         DateTime
+  endTime           DateTime?
+  status            DataSyncStatus @default(PENDING)
+  requestedLimit    Int?
+  fetchedCount      Int            @default(0)
+  insertedCount     Int            @default(0)
+  skippedDuplicates Int            @default(0)
+  errorMessage      String?
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  createdAt         DateTime       @default(now())
+  instrument        Instrument     @relation(fields: [instrumentId], references: [id])
+
+  @@index([provider, status, createdAt])
+  @@index([instrumentId, timeframe, startTime])
 }
 
 model TradingSignal {

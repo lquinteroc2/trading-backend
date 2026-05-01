@@ -30,6 +30,15 @@ Credenciales iniciales del seed:
 
 Puedes cambiarlas con `ADMIN_EMAIL` y `ADMIN_PASSWORD`.
 
+Variables de ingesta historica de Sprint 2:
+
+```env
+BINANCE_API_BASE_URL=https://api.binance.com
+MARKET_DATA_DEFAULT_PROVIDER=BINANCE
+MARKET_DATA_SYNC_DEFAULT_LIMIT=1000
+MARKET_DATA_SYNC_MAX_LIMIT=1000
+```
+
 ## Ejecutar con Docker Compose
 
 ```bash
@@ -93,7 +102,8 @@ npm run prisma:generate
 npm test
 ```
 
-Incluye pruebas unitarias para calculo de riesgo, servicio de instrumentos y servicio de señales.
+Incluye pruebas unitarias para calculo de riesgo, servicio de instrumentos, servicio de señales,
+provider Binance, sincronizacion historica y controller de sync.
 
 ## Endpoints principales
 
@@ -120,6 +130,86 @@ curl -X POST http://localhost:3000/api/v1/market-data/candles \
   -H "Content-Type: application/json" \
   -d '{"instrumentId":"<instrument-id>","timeframe":"M5","open":2000,"high":2010,"low":1995,"close":2005,"volume":1000,"timestamp":"2026-04-30T22:00:00.000Z","source":"manual"}'
 ```
+
+### Sprint 2: ingesta historica desde Binance
+
+El modulo de market data ahora incluye una abstraccion de proveedores y una implementacion inicial
+para Binance. El dominio trabaja con velas normalizadas internas; Binance queda como adaptador de
+infraestructura.
+
+Antes de sincronizar:
+
+```bash
+npm run prisma:migrate
+npm run prisma:seed
+```
+
+Obtén el token:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@trading.local","password":"ChangeMe123!"}'
+```
+
+Obtén el `instrumentId` de BTCUSDT:
+
+```bash
+curl http://localhost:3000/api/v1/instruments \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Sincronizar 1.000 velas BTCUSDT M15 directamente:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/market-data/sync \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
+    "timeframe": "M15",
+    "startTime": "2024-01-01T00:00:00.000Z",
+    "endTime": "2024-01-15T00:00:00.000Z",
+    "limit": 1000,
+    "provider": "BINANCE"
+  }'
+```
+
+Encolar el mismo sync con BullMQ:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/market-data/sync/enqueue \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
+    "timeframe": "M15",
+    "startTime": "2024-01-01T00:00:00.000Z",
+    "limit": 1000,
+    "provider": "BINANCE"
+  }'
+```
+
+Consultar velas guardadas:
+
+```bash
+curl "http://localhost:3000/api/v1/market-data/candles?instrumentId=ID_DEL_INSTRUMENTO_BTCUSDT&timeframe=M15&from=2024-01-01T00:00:00.000Z&to=2024-01-15T00:00:00.000Z&limit=1000&order=asc" \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Consultar auditoria de syncs:
+
+```bash
+curl "http://localhost:3000/api/v1/market-data/sync-jobs?provider=BINANCE&instrumentId=ID_DEL_INSTRUMENTO_BTCUSDT&timeframe=M15" \
+  -H "Authorization: Bearer TOKEN"
+
+curl http://localhost:3000/api/v1/market-data/sync-jobs/SYNC_JOB_ID \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Para verificar duplicados, ejecuta dos veces el mismo `POST /market-data/sync`. La segunda respuesta
+debe reportar `insertedCount` menor que `fetchedCount` y `skippedDuplicates` mayor que cero. La base
+tambien protege esto con el constraint unico `instrumentId + timeframe + timestamp`.
 
 Calcular riesgo:
 

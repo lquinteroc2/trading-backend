@@ -28,6 +28,11 @@ export class PrismaMarketCandlesRepository implements MarketCandlesRepository {
     return this.prisma.marketCandle.createMany({ data, skipDuplicates: true });
   }
 
+  async upsertManyCandles(data: CreateMarketCandleData[]): Promise<{ insertedCount: number }> {
+    const result = await this.prisma.marketCandle.createMany({ data, skipDuplicates: true });
+    return { insertedCount: result.count };
+  }
+
   async findMany(query: FindCandlesQuery): Promise<MarketCandleEntity[]> {
     const candles = await this.prisma.marketCandle.findMany({
       where: {
@@ -38,7 +43,8 @@ export class PrismaMarketCandlesRepository implements MarketCandlesRepository {
           lte: query.to,
         },
       },
-      orderBy: { timestamp: 'asc' },
+      orderBy: { timestamp: query.order ?? 'asc' },
+      take: query.limit,
     });
     return candles.map((candle) => this.toEntity(candle));
   }

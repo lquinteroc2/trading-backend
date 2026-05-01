@@ -12,4 +12,12 @@ export default () => ({
     port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
     password: process.env.REDIS_PASSWORD || undefined,
   },
+  marketData: {
+    defaultProvider: process.env.MARKET_DATA_DEFAULT_PROVIDER ?? 'BINANCE',
+    syncDefaultLimit: parseInt(process.env.MARKET_DATA_SYNC_DEFAULT_LIMIT ?? '1000', 10),
+    syncMaxLimit: parseInt(process.env.MARKET_DATA_SYNC_MAX_LIMIT ?? '1000', 10),
+  },
+  binance: {
+    apiBaseUrl: process.env.BINANCE_API_BASE_URL ?? 'https://api.binance.com',
+  },
 });
