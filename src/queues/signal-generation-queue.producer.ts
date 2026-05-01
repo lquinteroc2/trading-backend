@@ -3,6 +3,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { TechnicalAnalysisCompletedEvent, TRADING_EVENTS } from '@/events/trading-events';
 import { InternalEventBus } from '@/events/internal-event-bus.service';
+import { buildQueueJobId } from './queue-job-id';
 import { QUEUE_JOBS, QUEUE_NAMES } from './queue.constants';
 import { SignalGenerationJobPayload } from './signal-generation-queue.types';
 
@@ -39,7 +40,7 @@ export class SignalGenerationQueueProducer implements OnModuleInit {
         backoff: { type: 'exponential', delay: 1000 },
         removeOnComplete: true,
         removeOnFail: false,
-        jobId: `signal-generation:${event.agentDecisionId}`,
+        jobId: buildQueueJobId('signal-generation', event.agentDecisionId),
       },
     );
 

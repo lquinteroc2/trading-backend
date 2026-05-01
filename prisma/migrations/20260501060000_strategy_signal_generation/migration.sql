@@ -1,5 +1,9 @@
 -- CreateEnum
-CREATE TYPE "StrategyStatus" AS ENUM ('ACTIVE', 'INACTIVE');
+DO $$ BEGIN
+  CREATE TYPE "StrategyStatus" AS ENUM ('ACTIVE', 'INACTIVE');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
 -- AlterEnum
 ALTER TYPE "SignalDirection" ADD VALUE IF NOT EXISTS 'NONE';
@@ -10,12 +14,10 @@ ALTER TYPE "SignalStatus" ADD VALUE IF NOT EXISTS 'UNDER_REVIEW';
 
 -- AlterTable
 ALTER TABLE "TradingSignal"
-ADD COLUMN "strategyId" TEXT,
-ADD COLUMN "timeframe" "Timeframe",
-ADD COLUMN "candleTimestamp" TIMESTAMP(3),
-ADD COLUMN "reason" TEXT;
-
-ALTER TABLE "TradingSignal" ALTER COLUMN "status" SET DEFAULT 'CREATED';
+ADD COLUMN IF NOT EXISTS "strategyId" TEXT,
+ADD COLUMN IF NOT EXISTS "timeframe" "Timeframe",
+ADD COLUMN IF NOT EXISTS "candleTimestamp" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "reason" TEXT;
 
 -- CreateTable
 CREATE TABLE "Strategy" (

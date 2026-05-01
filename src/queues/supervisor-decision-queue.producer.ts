@@ -3,6 +3,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { InternalEventBus } from '@/events/internal-event-bus.service';
 import { RiskEvaluatedEvent, TRADING_EVENTS } from '@/events/trading-events';
+import { buildQueueJobId } from './queue-job-id';
 import { QUEUE_JOBS, QUEUE_NAMES } from './queue.constants';
 import { SupervisorDecisionJobPayload } from './supervisor-decision-queue.types';
 
@@ -31,7 +32,7 @@ export class SupervisorDecisionQueueProducer implements OnModuleInit {
         backoff: { type: 'exponential', delay: 1000 },
         removeOnComplete: true,
         removeOnFail: false,
-        jobId: `supervisor-decision:${signalId}`,
+        jobId: buildQueueJobId('supervisor-decision', signalId),
       },
     );
 

@@ -3,6 +3,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { InternalEventBus } from '@/events/internal-event-bus.service';
 import { CandleClosedEvent, TRADING_EVENTS } from '@/events/trading-events';
+import { buildQueueJobId } from './queue-job-id';
 import { QUEUE_JOBS, QUEUE_NAMES } from './queue.constants';
 import {
   PaperTradeEvaluateOpenTradesJobPayload,
@@ -35,7 +36,7 @@ export class PaperTradingQueueProducer implements OnModuleInit {
       backoff: { type: 'exponential', delay: 1000 },
       removeOnComplete: true,
       removeOnFail: false,
-      jobId: `paper-trade.open:${payload.signalId}:${payload.accountId ?? 'default'}`,
+      jobId: buildQueueJobId('paper-trade.open', payload.signalId, payload.accountId ?? 'default'),
     });
 
     this.logger.log(
@@ -57,7 +58,7 @@ export class PaperTradingQueueProducer implements OnModuleInit {
       backoff: { type: 'exponential', delay: 1000 },
       removeOnComplete: true,
       removeOnFail: false,
-      jobId: `paper-trade.evaluate-open-trades:${payload.candleId}`,
+      jobId: buildQueueJobId('paper-trade.evaluate-open-trades', payload.candleId),
     });
 
     this.logger.log(

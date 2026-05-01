@@ -3,6 +3,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { InternalEventBus } from '@/events/internal-event-bus.service';
 import { SignalCreatedEvent, TRADING_EVENTS } from '@/events/trading-events';
+import { buildQueueJobId } from './queue-job-id';
 import { QUEUE_JOBS, QUEUE_NAMES } from './queue.constants';
 import { RiskEvaluationJobPayload } from './risk-evaluation-queue.types';
 
@@ -31,7 +32,7 @@ export class RiskEvaluationQueueProducer implements OnModuleInit {
         backoff: { type: 'exponential', delay: 1000 },
         removeOnComplete: true,
         removeOnFail: false,
-        jobId: `risk-evaluation:${signalId}`,
+        jobId: buildQueueJobId('risk-evaluation', signalId),
       },
     );
 

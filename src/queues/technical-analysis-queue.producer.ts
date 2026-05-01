@@ -7,6 +7,7 @@ import { CandleClosedEvent, TRADING_EVENTS } from '@/events/trading-events';
 import { InternalEventBus } from '@/events/internal-event-bus.service';
 import { InstrumentsRepository } from '@/modules/instruments/domain/instruments.repository';
 import { TOKENS } from '@/shared/tokens';
+import { buildQueueJobId } from './queue-job-id';
 import { QUEUE_JOBS, QUEUE_NAMES } from './queue.constants';
 import { TechnicalAnalysisJobPayload } from './technical-analysis-queue.types';
 
@@ -93,7 +94,7 @@ export class TechnicalAnalysisQueueProducer implements OnModuleInit {
         removeOnComplete: true,
         removeOnFail: false,
         jobId: input.candleTimestamp
-          ? `technical-analysis:${symbol}:${input.timeframe}:${input.candleTimestamp.toISOString()}`
+          ? buildQueueJobId('technical-analysis', symbol, input.timeframe, input.candleTimestamp)
           : undefined,
       },
     );
