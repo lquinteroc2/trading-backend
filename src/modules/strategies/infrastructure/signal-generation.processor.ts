@@ -5,7 +5,10 @@ import { QUEUE_JOBS, QUEUE_NAMES } from '@/queues/queue.constants';
 import { SignalGenerationJobPayload } from '@/queues/signal-generation-queue.types';
 import { SignalGenerationService } from '../application/signal-generation.service';
 
-const signalGenerationConcurrency = parseInt(process.env.SIGNAL_GENERATION_QUEUE_CONCURRENCY ?? '5', 10);
+const signalGenerationConcurrency = parseInt(
+  process.env.SIGNAL_GENERATION_QUEUE_CONCURRENCY ?? '5',
+  10,
+);
 
 @Processor(QUEUE_NAMES.SIGNAL_GENERATION, { concurrency: signalGenerationConcurrency })
 export class SignalGenerationProcessor extends WorkerHost {
@@ -34,7 +37,9 @@ export class SignalGenerationProcessor extends WorkerHost {
     );
 
     try {
-      const result = await this.signalGeneration.generate({ agentDecisionId: job.data.agentDecisionId });
+      const result = await this.signalGeneration.generate({
+        agentDecisionId: job.data.agentDecisionId,
+      });
       this.logger.log(
         JSON.stringify({
           event: 'signal_generation_job',
@@ -50,7 +55,9 @@ export class SignalGenerationProcessor extends WorkerHost {
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const retryable = !(error instanceof BadRequestException || error instanceof NotFoundException);
+      const retryable = !(
+        error instanceof BadRequestException || error instanceof NotFoundException
+      );
       this.logger.error(
         JSON.stringify({
           event: 'signal_generation_job',

@@ -63,7 +63,9 @@ export class TechnicalAnalyzeUseCase {
       order: 'desc',
     });
     if (candles.length < minCandles) {
-      throw new BadRequestException(`Not enough candles. Required ${minCandles}, found ${candles.length}`);
+      throw new BadRequestException(
+        `Not enough candles. Required ${minCandles}, found ${candles.length}`,
+      );
     }
 
     const orderedCandles = [...candles].sort(

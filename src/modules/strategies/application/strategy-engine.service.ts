@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { TOKENS } from '@/shared/tokens';
 import { StrategiesRepository } from '../domain/strategies.repository';
+import { StrategyEntity } from '../domain/strategy.entity';
 import { IStrategy, StrategyContext, StrategyResult } from '../domain/strategy.types';
 import { EmaTrendStrategyService } from './ema-trend-strategy.service';
 
@@ -42,6 +43,28 @@ export class StrategyEngineService {
     }
 
     return results;
+  }
+
+  async evaluateStrategyByName(
+    strategyName: string,
+    context: StrategyContext,
+  ): Promise<StrategyResult | null> {
+    const strategy = await this.strategiesRepository.findActiveByName(strategyName);
+    if (!strategy) {
+      return null;
+    }
+
+    return this.evaluateStrategy(strategy, context);
+  }
+
+  evaluateStrategy(strategy: StrategyEntity, context: StrategyContext): StrategyResult | null {
+    const implementation = this.implementations().get(strategy.name);
+    if (!implementation) {
+      this.logger.warn(`No implementation registered for strategy ${strategy.name}`);
+      return null;
+    }
+
+    return implementation.evaluate(context, strategy);
   }
 
   private implementations(): Map<string, IStrategy> {

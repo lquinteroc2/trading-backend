@@ -1,5 +1,13 @@
 import { plainToInstance } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsOptional, IsString, Min, validateSync } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Min,
+  validateSync,
+} from 'class-validator';
 
 class EnvironmentVariables {
   @IsOptional()
@@ -104,6 +112,24 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   SIGNAL_GENERATION_QUEUE_CONCURRENCY?: number;
+
+  @IsOptional()
+  @Min(0)
+  PAPER_TRADING_DEFAULT_BALANCE?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  PAPER_TRADING_MAX_OPEN_TRADES_PER_SYMBOL?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  PAPER_TRADING_ENABLED?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  PAPER_TRADING_QUEUE_CONCURRENCY?: number;
 }
 
 export function validateConfig(config: Record<string, unknown>) {

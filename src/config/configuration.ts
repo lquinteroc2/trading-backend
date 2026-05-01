@@ -39,4 +39,12 @@ export default () => ({
     atrTakeProfitMultiplier: parseFloat(process.env.SIGNAL_ATR_TP_MULTIPLIER ?? '3'),
     queueConcurrency: parseInt(process.env.SIGNAL_GENERATION_QUEUE_CONCURRENCY ?? '5', 10),
   },
+  paperTrading: {
+    enabled: (process.env.PAPER_TRADING_ENABLED ?? 'true').toLowerCase() === 'true',
+    defaultBalance: parseFloat(process.env.PAPER_TRADING_DEFAULT_BALANCE ?? '10000'),
+    maxOpenTradesPerSymbol: parseInt(
+      process.env.PAPER_TRADING_MAX_OPEN_TRADES_PER_SYMBOL ?? '1',
+      10,
+    ),
+  },
 });

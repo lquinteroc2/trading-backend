@@ -1,57 +1,32 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { PaperTradeResult, PaperTradeStatus, TradeDirection } from '@prisma/client';
-import { TOKENS } from '@/shared/tokens';
-import {
-  CreatePaperTradeData,
-  PaperTradesRepository,
-} from '../domain/paper-trades.repository';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { PaperTradeCloseReason } from '@prisma/client';
+import { CreatePaperTradeData, FindPaperTradesQuery } from '../domain/paper-trades.repository';
+import { PaperTradingEngineService } from './paper-trading-engine.service';
 
 @Injectable()
 export class PaperTradingService {
-  constructor(
-    @Inject(TOKENS.PAPER_TRADES_REPOSITORY)
-    private readonly paperTradesRepository: PaperTradesRepository,
-  ) {}
+  constructor(private readonly engine: PaperTradingEngineService) {}
 
   create(data: CreatePaperTradeData) {
-    return this.paperTradesRepository.create(data);
+    if (!data.signalId) {
+      throw new BadRequestException('signalId is required to open a paper trade');
+    }
+    return this.engine.openTradeFromSignal(data.signalId, data.accountId);
   }
 
-  findMany() {
-    return this.paperTradesRepository.findMany();
+  findMany(query: FindPaperTradesQuery = {}) {
+    return this.engine.findTrades(query);
   }
 
   async findById(id: string) {
-    const trade = await this.paperTradesRepository.findById(id);
-    if (!trade) {
-      throw new NotFoundException('Paper trade not found');
-    }
-    return trade;
+    return this.engine.findTradeById(id);
   }
 
-  async close(id: string, closePrice: number) {
-    const trade = await this.findById(id);
-    if (trade.status !== PaperTradeStatus.OPEN) {
-      throw new BadRequestException('Only open paper trades can be closed');
-    }
-
-    const signedDistance =
-      trade.direction === TradeDirection.BUY
-        ? closePrice - trade.entryPrice
-        : trade.entryPrice - closePrice;
-    const pnl = signedDistance * trade.positionSize;
-    const exposure = trade.entryPrice * trade.positionSize;
-    const pnlPercent = exposure === 0 ? 0 : (pnl / exposure) * 100;
-    const result =
-      pnl > 0 ? PaperTradeResult.WIN : pnl < 0 ? PaperTradeResult.LOSS : PaperTradeResult.BREAKEVEN;
-
-    return this.paperTradesRepository.close(id, {
-      status: PaperTradeStatus.CLOSED,
-      closedAt: new Date(),
-      closePrice,
-      pnl,
-      pnlPercent,
-      result,
-    });
+  async close(
+    id: string,
+    closePrice: number,
+    closeReason: PaperTradeCloseReason = PaperTradeCloseReason.MANUAL,
+  ) {
+    return this.engine.closeTrade(id, closePrice, closeReason);
   }
 }

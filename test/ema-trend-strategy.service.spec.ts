@@ -35,7 +35,10 @@ describe('EmaTrendStrategyService', () => {
   };
 
   const service = new EmaTrendStrategyService({
-    get: jest.fn((key: string) => ({ 'signals.atrStopLossMultiplier': 1.5, 'signals.atrTakeProfitMultiplier': 3 })[key]),
+    get: jest.fn(
+      (key: string) =>
+        ({ 'signals.atrStopLossMultiplier': 1.5, 'signals.atrTakeProfitMultiplier': 3 })[key],
+    ),
   } as unknown as ConfigService);
 
   const context = (indicators: Record<string, number>): StrategyContext => ({

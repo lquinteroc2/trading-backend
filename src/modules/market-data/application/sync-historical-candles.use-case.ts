@@ -1,17 +1,14 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSyncStatus, Timeframe } from '@prisma/client';
 import { InternalEventBus } from '@/events/internal-event-bus.service';
 import { TRADING_EVENTS } from '@/events/trading-events';
 import { TOKENS } from '@/shared/tokens';
 import { InstrumentsRepository } from '@/modules/instruments/domain/instruments.repository';
-import { CreateMarketCandleData, MarketCandlesRepository } from '../domain/market-candles.repository';
+import {
+  CreateMarketCandleData,
+  MarketCandlesRepository,
+} from '../domain/market-candles.repository';
 import { MarketDataProvider } from '../domain/market-data-provider.interface';
 import { MarketDataSyncJobsRepository } from '../domain/market-data-sync-jobs.repository';
 
@@ -134,7 +131,15 @@ export class SyncHistoricalCandlesUseCase {
       if (input.triggerAnalysis && insertedCount > 0) {
         const latestInsertedCandle = sortedCandles.at(-1);
         if (latestInsertedCandle) {
+          const [persistedCandle] = await this.candlesRepository.findMany({
+            instrumentId: instrument.id,
+            timeframe: input.timeframe,
+            from: latestInsertedCandle.timestamp,
+            to: latestInsertedCandle.timestamp,
+            limit: 1,
+          });
           this.eventBus.emit(TRADING_EVENTS.CANDLE_CLOSED, {
+            candleId: persistedCandle?.id,
             instrumentId: instrument.id,
             timeframe: input.timeframe,
             candleTimestamp: latestInsertedCandle.timestamp,

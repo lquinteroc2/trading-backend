@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SignalDirection } from '@prisma/client';
-import { IStrategy, StrategyContext, StrategyResult, TechnicalIndicators } from '../domain/strategy.types';
+import {
+  IStrategy,
+  StrategyContext,
+  StrategyResult,
+  TechnicalIndicators,
+} from '../domain/strategy.types';
 import { StrategyEntity } from '../domain/strategy.entity';
 
 type EmaTrendParameters = {
@@ -23,18 +28,41 @@ export class EmaTrendStrategyService implements IStrategy {
     const indicators = this.readIndicators(context.technicalAnalysis.metadata);
     const missing = this.missingIndicators(indicators);
     if (missing.length > 0) {
-      return this.noSignal(strategy, context.latestCandle.close, `Missing indicators: ${missing.join(', ')}`);
+      return this.noSignal(
+        strategy,
+        context.latestCandle.close,
+        `Missing indicators: ${missing.join(', ')}`,
+      );
     }
 
     const params = this.readParameters(strategy);
     const entryPrice = context.latestCandle.close;
-    const bullishAlignment = indicators.ema20! > indicators.ema50! && indicators.ema50! > indicators.ema200!;
-    const bearishAlignment = indicators.ema20! < indicators.ema50! && indicators.ema50! < indicators.ema200!;
-    const rsiConfirmsBuy = this.between(indicators.rsi14!, params.rsiBuyMin ?? 45, params.rsiBuyMax ?? 70);
-    const rsiConfirmsSell = this.between(indicators.rsi14!, params.rsiSellMin ?? 30, params.rsiSellMax ?? 55);
-    const atrStable = (indicators.atr14! / entryPrice) * 100 <= (params.atrStableMaxPercentOfPrice ?? 5);
-    const bullishCandles = this.isConsistentTrend(context, 'BUY', params.trendConsistencyCandles ?? 3);
-    const bearishCandles = this.isConsistentTrend(context, 'SELL', params.trendConsistencyCandles ?? 3);
+    const bullishAlignment =
+      indicators.ema20! > indicators.ema50! && indicators.ema50! > indicators.ema200!;
+    const bearishAlignment =
+      indicators.ema20! < indicators.ema50! && indicators.ema50! < indicators.ema200!;
+    const rsiConfirmsBuy = this.between(
+      indicators.rsi14!,
+      params.rsiBuyMin ?? 45,
+      params.rsiBuyMax ?? 70,
+    );
+    const rsiConfirmsSell = this.between(
+      indicators.rsi14!,
+      params.rsiSellMin ?? 30,
+      params.rsiSellMax ?? 55,
+    );
+    const atrStable =
+      (indicators.atr14! / entryPrice) * 100 <= (params.atrStableMaxPercentOfPrice ?? 5);
+    const bullishCandles = this.isConsistentTrend(
+      context,
+      'BUY',
+      params.trendConsistencyCandles ?? 3,
+    );
+    const bearishCandles = this.isConsistentTrend(
+      context,
+      'SELL',
+      params.trendConsistencyCandles ?? 3,
+    );
     const slMultiplier = this.config.get<number>('signals.atrStopLossMultiplier') ?? 1.5;
     const tpMultiplier = this.config.get<number>('signals.atrTakeProfitMultiplier') ?? 3;
 
@@ -86,9 +114,10 @@ export class EmaTrendStrategyService implements IStrategy {
       };
     }
 
-    const reason = bullishAlignment || bearishAlignment
-      ? `NO_SIGNAL: RSI14=${indicators.rsi14} does not confirm the aligned EMA trend`
-      : 'NO_SIGNAL: EMAs are not aligned';
+    const reason =
+      bullishAlignment || bearishAlignment
+        ? `NO_SIGNAL: RSI14=${indicators.rsi14} does not confirm the aligned EMA trend`
+        : 'NO_SIGNAL: EMAs are not aligned';
     return this.noSignal(strategy, entryPrice, reason);
   }
 
@@ -135,7 +164,11 @@ export class EmaTrendStrategyService implements IStrategy {
     return Math.max(0, Math.min(100, score));
   }
 
-  private isConsistentTrend(context: StrategyContext, direction: 'BUY' | 'SELL', candlesCount: number): boolean {
+  private isConsistentTrend(
+    context: StrategyContext,
+    direction: 'BUY' | 'SELL',
+    candlesCount: number,
+  ): boolean {
     const candles = [...(context.candles ?? [])]
       .sort((left, right) => left.timestamp.getTime() - right.timestamp.getTime())
       .slice(-candlesCount);

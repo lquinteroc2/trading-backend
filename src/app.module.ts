@@ -8,6 +8,7 @@ import { AgentsModule } from './modules/agents/agents.module';
 import { RiskModule } from './modules/risk/risk.module';
 import { PaperTradingModule } from './modules/paper-trading/paper-trading.module';
 import { StrategiesModule } from './modules/strategies/strategies.module';
+import { BacktestingModule } from './modules/backtesting/backtesting.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { QueuesModule } from './queues/queues.module';
@@ -31,6 +32,7 @@ import { validateConfig } from './config/env.validation';
     MarketDataModule,
     SignalsModule,
     StrategiesModule,
+    BacktestingModule,
     AgentsModule,
     RiskModule,
     PaperTradingModule,

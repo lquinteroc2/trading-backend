@@ -3,16 +3,16 @@ import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { InstrumentsModule } from '@/modules/instruments/instruments.module';
 import { QUEUE_NAMES } from './queue.constants';
-import {
-  AgentDecisionProcessor,
-  MarketDataProcessor,
-  PaperTradingProcessor,
-} from './processors';
+import { AgentDecisionProcessor, MarketDataProcessor } from './processors';
 import { QueuesController } from './queues.controller';
+import { RiskEvaluationQueueProducer } from './risk-evaluation-queue.producer';
 import { SignalGenerationQueueProducer } from './signal-generation-queue.producer';
 import { TechnicalAnalysisQueueProducer } from './technical-analysis-queue.producer';
+import { PaperTradingQueueProducer } from './paper-trading-queue.producer';
 
-const queueRegistrations = Object.values(QUEUE_NAMES).map((name) => BullModule.registerQueue({ name }));
+const queueRegistrations = Object.values(QUEUE_NAMES).map((name) =>
+  BullModule.registerQueue({ name }),
+);
 
 @Module({
   imports: [
@@ -33,10 +33,17 @@ const queueRegistrations = Object.values(QUEUE_NAMES).map((name) => BullModule.r
   providers: [
     MarketDataProcessor,
     AgentDecisionProcessor,
-    PaperTradingProcessor,
+    RiskEvaluationQueueProducer,
+    PaperTradingQueueProducer,
     TechnicalAnalysisQueueProducer,
     SignalGenerationQueueProducer,
   ],
-  exports: [BullModule, TechnicalAnalysisQueueProducer, SignalGenerationQueueProducer],
+  exports: [
+    BullModule,
+    TechnicalAnalysisQueueProducer,
+    SignalGenerationQueueProducer,
+    RiskEvaluationQueueProducer,
+    PaperTradingQueueProducer,
+  ],
 })
 export class QueuesModule {}

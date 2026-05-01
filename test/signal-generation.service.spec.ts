@@ -74,7 +74,10 @@ describe('SignalGenerationService', () => {
     expiresAt: null,
   };
 
-  const makeService = (overrides?: { existingSignal?: typeof signal | null; technicalConfidence?: number }) => {
+  const makeService = (overrides?: {
+    existingSignal?: typeof signal | null;
+    technicalConfidence?: number;
+  }) => {
     const decisions = {
       findById: jest.fn().mockResolvedValue({
         ...decision,

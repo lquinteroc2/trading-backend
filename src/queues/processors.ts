@@ -7,6 +7,3 @@ export class MarketDataProcessor extends LoggingProcessor {}
 
 @Processor(QUEUE_NAMES.AGENT_DECISION)
 export class AgentDecisionProcessor extends LoggingProcessor {}
-
-@Processor(QUEUE_NAMES.PAPER_TRADING)
-export class PaperTradingProcessor extends LoggingProcessor {}

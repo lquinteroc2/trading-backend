@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  PaperTradeCloseReason,
   PaperTradeResult,
   PaperTradeStatus,
   Prisma,
@@ -10,6 +11,7 @@ import { PaperTradeEntity } from '../domain/paper-trade.entity';
 import {
   ClosePaperTradeData,
   CreatePaperTradeData,
+  FindPaperTradesQuery,
   PaperTradesRepository,
 } from '../domain/paper-trades.repository';
 
@@ -21,13 +23,46 @@ export class PrismaPaperTradesRepository implements PaperTradesRepository {
     return this.toEntity(await this.prisma.paperTrade.create({ data }));
   }
 
-  async findMany(): Promise<PaperTradeEntity[]> {
-    const trades = await this.prisma.paperTrade.findMany({ orderBy: { openedAt: 'desc' } });
+  async findMany(query: FindPaperTradesQuery = {}): Promise<PaperTradeEntity[]> {
+    const trades = await this.prisma.paperTrade.findMany({
+      where: {
+        accountId: query.accountId,
+        instrumentId: query.instrumentId,
+        status: query.status,
+        result: query.result,
+        openedAt: {
+          gte: query.from,
+          lte: query.to,
+        },
+      },
+      orderBy: { openedAt: 'desc' },
+    });
     return trades.map((trade) => this.toEntity(trade));
   }
 
   async findById(id: string): Promise<PaperTradeEntity | null> {
     const trade = await this.prisma.paperTrade.findUnique({ where: { id } });
+    return trade ? this.toEntity(trade) : null;
+  }
+
+  async findOpenByInstrument(instrumentId: string): Promise<PaperTradeEntity | null> {
+    const trade = await this.prisma.paperTrade.findFirst({
+      where: { instrumentId, status: PaperTradeStatus.OPEN },
+      orderBy: { openedAt: 'desc' },
+    });
+    return trade ? this.toEntity(trade) : null;
+  }
+
+  async findOpenByAccount(accountId: string): Promise<PaperTradeEntity[]> {
+    const trades = await this.prisma.paperTrade.findMany({
+      where: { accountId, status: PaperTradeStatus.OPEN },
+      orderBy: { openedAt: 'desc' },
+    });
+    return trades.map((trade) => this.toEntity(trade));
+  }
+
+  async findBySignalId(signalId: string): Promise<PaperTradeEntity | null> {
+    const trade = await this.prisma.paperTrade.findUnique({ where: { signalId } });
     return trade ? this.toEntity(trade) : null;
   }
 
@@ -37,6 +72,7 @@ export class PrismaPaperTradesRepository implements PaperTradesRepository {
 
   private toEntity(trade: {
     id: string;
+    accountId: string;
     signalId: string | null;
     instrumentId: string;
     direction: TradeDirection;
@@ -51,9 +87,11 @@ export class PrismaPaperTradesRepository implements PaperTradesRepository {
     pnl: Prisma.Decimal | null;
     pnlPercent: Prisma.Decimal | null;
     result: PaperTradeResult;
+    closeReason: PaperTradeCloseReason | null;
   }) {
     return new PaperTradeEntity(
       trade.id,
+      trade.accountId,
       trade.signalId,
       trade.instrumentId,
       trade.direction,
@@ -68,6 +106,7 @@ export class PrismaPaperTradesRepository implements PaperTradesRepository {
       trade.pnl?.toNumber() ?? null,
       trade.pnlPercent?.toNumber() ?? null,
       trade.result,
+      trade.closeReason,
     );
   }
 }

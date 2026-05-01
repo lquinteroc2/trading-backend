@@ -6,7 +6,10 @@ import { SignalsController } from './presentation/signals.controller';
 
 @Module({
   controllers: [SignalsController],
-  providers: [SignalsService, { provide: TOKENS.SIGNALS_REPOSITORY, useClass: PrismaSignalsRepository }],
+  providers: [
+    SignalsService,
+    { provide: TOKENS.SIGNALS_REPOSITORY, useClass: PrismaSignalsRepository },
+  ],
   exports: [SignalsService, TOKENS.SIGNALS_REPOSITORY],
 })
 export class SignalsModule {}

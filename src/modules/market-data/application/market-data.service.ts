@@ -26,6 +26,7 @@ export class MarketDataService {
     const candle = await this.candlesRepository.create(data);
     this.eventBus.emit(TRADING_EVENTS.CANDLE_CREATED, candle);
     this.eventBus.emit(TRADING_EVENTS.CANDLE_CLOSED, {
+      candleId: candle.id,
       instrumentId: candle.instrumentId,
       timeframe: candle.timeframe,
       candleTimestamp: candle.timestamp,

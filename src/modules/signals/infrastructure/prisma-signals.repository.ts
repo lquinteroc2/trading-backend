@@ -55,7 +55,9 @@ export class PrismaSignalsRepository implements TradingSignalsRepository {
   }
 
   async updateStatus(id: string, status: SignalStatus): Promise<TradingSignalEntity> {
-    return this.toEntity(await this.prisma.tradingSignal.update({ where: { id }, data: { status } }));
+    return this.toEntity(
+      await this.prisma.tradingSignal.update({ where: { id }, data: { status } }),
+    );
   }
 
   private toEntity(signal: {

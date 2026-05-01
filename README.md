@@ -444,6 +444,10 @@ SIGNAL_MIN_CONFIDENCE=50
 SIGNAL_ATR_SL_MULTIPLIER=1.5
 SIGNAL_ATR_TP_MULTIPLIER=3
 SIGNAL_GENERATION_QUEUE_CONCURRENCY=5
+PAPER_TRADING_DEFAULT_BALANCE=10000
+PAPER_TRADING_MAX_OPEN_TRADES_PER_SYMBOL=1
+PAPER_TRADING_ENABLED=true
+PAPER_TRADING_QUEUE_CONCURRENCY=5
 ```
 
 Los parametros versionados de estrategia viven en `StrategyVersion.parameters`; para `v1` incluyen
@@ -481,6 +485,87 @@ curl -X POST http://localhost:3000/api/v1/risk/calculate-position-size \
   -d '{"accountBalance":10000,"riskPercent":1,"entryPrice":2000,"stopLoss":1990,"takeProfit":2020,"instrumentId":"<instrument-id>"}'
 ```
 
+### Sprint 8: Paper Trading Engine
+
+El flujo automatico queda asi:
+
+```text
+TradingSignal -> Risk Agent APPROVE -> paper-trading-queue
+-> PaperTradingEngine -> PaperTrade OPEN
+-> CANDLE_CLOSED -> evaluate-open-trades -> cierre por SL/TP -> balance actualizado
+```
+
+El seed crea una cuenta `DEFAULT_PAPER_ACCOUNT` con balance inicial `10000` USD. Tambien puedes crear
+cuentas manualmente:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/paper-trading/accounts \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"MY_PAPER_ACCOUNT","initialBalance":10000,"currency":"USD"}'
+```
+
+Consultar balance y cuentas:
+
+```bash
+curl http://localhost:3000/api/v1/paper-trading/accounts \
+  -H "Authorization: Bearer TOKEN"
+
+curl http://localhost:3000/api/v1/paper-trading/accounts/ACCOUNT_ID \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Abrir un trade simulado desde una señal aprobada por riesgo:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/paper-trading/trades/open \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"signalId":"SIGNAL_ID","accountId":"ACCOUNT_ID"}'
+```
+
+Si omites `accountId`, el motor usa la primera cuenta paper activa. La apertura exige señal
+`APPROVED` o `UNDER_REVIEW`, `AgentDecision` de tipo `RISK` con `APPROVE`, SL/TP validos, position
+size del assessment/metadata de riesgo, y que no exista un trade abierto del mismo instrumento ni un
+trade duplicado para el mismo `signalId`.
+
+Evaluar trades abiertos con una vela:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/paper-trading/evaluate-candle \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"candleId":"CANDLE_ID"}'
+```
+
+El cierre por vela es conservador: si SL y TP ocurren en la misma vela, se toma primero el stop loss.
+Para BUY se cierra en SL cuando `low <= stopLoss` y en TP cuando `high >= takeProfit`; para SELL se
+cierra en SL cuando `high >= stopLoss` y en TP cuando `low <= takeProfit`.
+
+Cerrar manualmente:
+
+```bash
+curl -X PATCH http://localhost:3000/api/v1/paper-trading/trades/TRADE_ID/close \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"closePrice":65000,"closeReason":"MANUAL"}'
+```
+
+Consultar trades abiertos/cerrados:
+
+```bash
+curl "http://localhost:3000/api/v1/paper-trading/trades?accountId=ACCOUNT_ID&status=OPEN" \
+  -H "Authorization: Bearer TOKEN"
+
+curl "http://localhost:3000/api/v1/paper-trading/trades?instrumentId=INSTRUMENT_ID&result=WIN" \
+  -H "Authorization: Bearer TOKEN"
+```
+
+El PnL se calcula como `(closePrice - entryPrice) * positionSize` en BUY y
+`(entryPrice - closePrice) * positionSize` en SELL. Al cerrar, el balance de la cuenta se actualiza
+con `balance + pnl` y se registra auditoria estructurada en logs (`paper_trade_opened` y
+`paper_trade_closed`).
+
 ## Estructura
 
 ```text
@@ -511,9 +596,9 @@ Cada modulo de negocio separa:
 - `infrastructure`: adaptadores concretos, por ahora Prisma.
 - `presentation`: controllers y DTOs HTTP.
 
-## Listo para Sprint 6
+## Listo para Sprint 9
 
-- Agregar backtesting sobre velas e indicadores persistidos.
-- Medir performance por estrategia/version sin ejecutar trades reales.
-- Profundizar agentes tecnicos/fundamentales/riesgo sobre las interfaces existentes.
-- Integrar brokers en modo sandbox antes de cualquier ejecucion real.
+- Agregar supervisor final que coordine technical/risk/paper trading.
+- Definir politicas de portfolio sobre multiples instrumentos y cuentas.
+- Exponer metricas agregadas de cuenta/trades para dashboard.
+- Preparar integracion sandbox con broker sin tocar ejecucion real todavia.

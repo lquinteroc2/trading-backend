@@ -64,7 +64,11 @@ export class SignalGenerationService {
 
     const minConfidence = this.config.get<number>('signals.minConfidence') ?? 50;
     if (decision.confidenceScore < minConfidence) {
-      return this.noSignal(metadata.symbol, timeframe, `Technical confidence ${decision.confidenceScore} < ${minConfidence}`);
+      return this.noSignal(
+        metadata.symbol,
+        timeframe,
+        `Technical confidence ${decision.confidenceScore} < ${minConfidence}`,
+      );
     }
     if (metadata.technicalBias === 'NEUTRAL') {
       return this.noSignal(metadata.symbol, timeframe, 'Technical bias is NEUTRAL');
@@ -92,7 +96,11 @@ export class SignalGenerationService {
       candleTimestamp: latestCandle.timestamp,
     });
     if (existing) {
-      return { status: 'SKIPPED_DUPLICATE', signal: existing, reason: 'Signal already exists for candle' };
+      return {
+        status: 'SKIPPED_DUPLICATE',
+        signal: existing,
+        reason: 'Signal already exists for candle',
+      };
     }
 
     const results = await this.strategyEngine.evaluateActiveStrategies({
@@ -101,7 +109,9 @@ export class SignalGenerationService {
       timeframe,
       technicalAnalysis: decision,
       latestCandle,
-      candles: [...candles].sort((left, right) => left.timestamp.getTime() - right.timestamp.getTime()),
+      candles: [...candles].sort(
+        (left, right) => left.timestamp.getTime() - right.timestamp.getTime(),
+      ),
     });
 
     const result = results.find((candidate) => candidate.shouldCreateSignal);
@@ -142,7 +152,9 @@ export class SignalGenerationService {
 
   private async findLatestDecision(input: GenerateSignalInput) {
     if (!input.instrumentId || !input.timeframe) {
-      throw new BadRequestException('instrumentId and timeframe are required when agentDecisionId is not provided');
+      throw new BadRequestException(
+        'instrumentId and timeframe are required when agentDecisionId is not provided',
+      );
     }
 
     return this.decisionsRepository.findLatest({
@@ -159,7 +171,11 @@ export class SignalGenerationService {
     return metadata as TechnicalDecisionMetadata;
   }
 
-  private noSignal(symbol: string | undefined, timeframe: Timeframe, reason: string): GenerateSignalOutput {
+  private noSignal(
+    symbol: string | undefined,
+    timeframe: Timeframe,
+    reason: string,
+  ): GenerateSignalOutput {
     this.logger.log(
       JSON.stringify({
         event: 'signal_generation',

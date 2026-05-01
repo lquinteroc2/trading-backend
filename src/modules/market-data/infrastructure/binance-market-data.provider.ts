@@ -52,9 +52,7 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
     return this.supportedSymbols.has(symbol.toUpperCase());
   }
 
-  async fetchHistoricalCandles(
-    params: FetchHistoricalCandlesParams,
-  ): Promise<NormalizedCandle[]> {
+  async fetchHistoricalCandles(params: FetchHistoricalCandlesParams): Promise<NormalizedCandle[]> {
     const symbol = params.symbol.toUpperCase();
     if (!this.supportsSymbol(symbol)) {
       throw new BadRequestException(`Symbol ${params.symbol} is not supported by BINANCE`);

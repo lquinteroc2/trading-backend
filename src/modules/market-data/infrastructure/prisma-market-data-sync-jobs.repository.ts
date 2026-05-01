@@ -24,10 +24,7 @@ export class PrismaMarketDataSyncJobsRepository implements MarketDataSyncJobsRep
     return this.toEntity(job);
   }
 
-  async update(
-    id: string,
-    data: UpdateMarketDataSyncJobData,
-  ): Promise<MarketDataSyncJobEntity> {
+  async update(id: string, data: UpdateMarketDataSyncJobData): Promise<MarketDataSyncJobEntity> {
     const job = await this.prisma.marketDataSyncJob.update({ where: { id }, data });
     return this.toEntity(job);
   }

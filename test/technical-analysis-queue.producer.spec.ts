@@ -35,12 +35,7 @@ describe('TechnicalAnalysisQueueProducer', () => {
     } as unknown as ConfigService;
 
     return {
-      producer: new TechnicalAnalysisQueueProducer(
-        queue as never,
-        instruments,
-        eventBus,
-        config,
-      ),
+      producer: new TechnicalAnalysisQueueProducer(queue as never, instruments, eventBus, config),
       queue,
       eventBus,
     };
