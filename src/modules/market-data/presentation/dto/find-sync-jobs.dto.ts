@@ -8,24 +8,27 @@ export class FindSyncJobsDto {
   @IsString()
   provider?: string;
 
+  @ApiPropertyOptional({ example: 'ID_DEL_INSTRUMENTO_BTCUSDT' })
   @IsOptional()
   @IsUUID()
   instrumentId?: string;
 
-  @ApiPropertyOptional({ enum: Timeframe })
+  @ApiPropertyOptional({ enum: Timeframe, example: Timeframe.M15 })
   @IsOptional()
   @IsEnum(Timeframe)
   timeframe?: Timeframe;
 
-  @ApiPropertyOptional({ enum: DataSyncStatus })
+  @ApiPropertyOptional({ enum: DataSyncStatus, example: DataSyncStatus.COMPLETED })
   @IsOptional()
   @IsEnum(DataSyncStatus)
   status?: DataSyncStatus;
 
+  @ApiPropertyOptional({ example: '2024-01-01T00:00:00.000Z' })
   @IsOptional()
   @IsDateString()
   from?: string;
 
+  @ApiPropertyOptional({ example: '2024-01-15T00:00:00.000Z' })
   @IsOptional()
   @IsDateString()
   to?: string;

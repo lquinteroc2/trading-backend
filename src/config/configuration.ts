@@ -20,4 +20,9 @@ export default () => ({
   binance: {
     apiBaseUrl: process.env.BINANCE_API_BASE_URL ?? 'https://api.binance.com',
   },
+  technicalAgent: {
+    baseUrl: process.env.TECHNICAL_AGENT_BASE_URL ?? 'http://localhost:8000',
+    minCandles: parseInt(process.env.TECHNICAL_ANALYSIS_MIN_CANDLES ?? '200', 10),
+    defaultLimit: parseInt(process.env.TECHNICAL_ANALYSIS_DEFAULT_LIMIT ?? '1000', 10),
+  },
 });

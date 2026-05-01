@@ -39,6 +39,14 @@ MARKET_DATA_SYNC_DEFAULT_LIMIT=1000
 MARKET_DATA_SYNC_MAX_LIMIT=1000
 ```
 
+Variables de analisis tecnico de Sprint 3:
+
+```env
+TECHNICAL_AGENT_BASE_URL=http://localhost:8000
+TECHNICAL_ANALYSIS_MIN_CANDLES=200
+TECHNICAL_ANALYSIS_DEFAULT_LIMIT=1000
+```
+
 ## Ejecutar con Docker Compose
 
 ```bash
@@ -50,6 +58,7 @@ La API queda disponible en:
 - API: `http://localhost:3000/api/v1`
 - Swagger: `http://localhost:3000/api/docs`
 - Health: `http://localhost:3000/api/v1/health`
+- Worker tecnico: `http://localhost:8000/health`
 
 Para cargar seed dentro del contenedor:
 
@@ -103,7 +112,14 @@ npm test
 ```
 
 Incluye pruebas unitarias para calculo de riesgo, servicio de instrumentos, servicio de señales,
-provider Binance, sincronizacion historica y controller de sync.
+provider Binance, sincronizacion historica, controller de sync e integracion de analisis tecnico.
+
+Tests del worker Python:
+
+```bash
+cd services/agents
+pytest
+```
 
 ## Endpoints principales
 
@@ -211,6 +227,72 @@ Para verificar duplicados, ejecuta dos veces el mismo `POST /market-data/sync`. 
 debe reportar `insertedCount` menor que `fetchedCount` y `skippedDuplicates` mayor que cero. La base
 tambien protege esto con el constraint unico `instrumentId + timeframe + timestamp`.
 
+### Sprint 3: worker Python de analisis tecnico
+
+El worker FastAPI vive en `services/agents` y calcula EMA20, EMA50, EMA200, RSI14 y ATR14 sin
+generar señales ni ejecutar trades.
+
+Instalar y correr el worker local:
+
+```bash
+cd services/agents
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Probar health:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Con Docker Compose, el servicio `technical-agent-worker` se levanta junto a backend, PostgreSQL y
+Redis:
+
+```bash
+docker compose up --build
+```
+
+Analizar BTCUSDT desde el backend con velas guardadas en Sprint 2:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/agents/technical/analyze \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
+    "timeframe": "M15",
+    "limit": 1000
+  }'
+```
+
+Encolar el mismo analisis con BullMQ:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/agents/technical/analyze/enqueue \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
+    "timeframe": "M15",
+    "limit": 1000
+  }'
+```
+
+Consultar el ultimo analisis tecnico guardado:
+
+```bash
+curl "http://localhost:3000/api/v1/agents/technical/latest?instrumentId=ID_DEL_INSTRUMENTO_BTCUSDT&timeframe=M15" \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Verificar persistencia en PostgreSQL:
+
+```bash
+docker compose exec postgres psql -U trading -d trading \
+  -c "select id, \"agentType\", decision, \"confidenceScore\", \"createdAt\" from \"AgentDecision\" where \"instrumentId\" = 'ID_DEL_INSTRUMENTO_BTCUSDT' order by \"createdAt\" desc limit 5;"
+```
+
 Calcular riesgo:
 
 ```bash
@@ -248,10 +330,9 @@ Cada modulo de negocio separa:
 - `infrastructure`: adaptadores concretos, por ahora Prisma.
 - `presentation`: controllers y DTOs HTTP.
 
-## Listo para Sprint 2
+## Listo para Sprint 4
 
-- Conectar proveedores reales de market data.
-- Encolar ingestion, generacion de señales y decisiones.
-- Implementar agentes tecnicos/fundamentales/riesgo sobre las interfaces existentes.
-- Agregar backtesting y metricas de performance.
+- Convertir lecturas tecnicas en señales candidatas sin operar dinero real.
+- Agregar backtesting sobre velas e indicadores persistidos.
+- Profundizar agentes tecnicos/fundamentales/riesgo sobre las interfaces existentes.
 - Integrar brokers en modo sandbox antes de cualquier ejecucion real.

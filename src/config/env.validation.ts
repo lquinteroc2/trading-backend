@@ -52,6 +52,20 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   MARKET_DATA_SYNC_MAX_LIMIT?: number;
+
+  @IsOptional()
+  @IsString()
+  TECHNICAL_AGENT_BASE_URL?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  TECHNICAL_ANALYSIS_MIN_CANDLES?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  TECHNICAL_ANALYSIS_DEFAULT_LIMIT?: number;
 }
 
 export function validateConfig(config: Record<string, unknown>) {

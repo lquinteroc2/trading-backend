@@ -5,6 +5,7 @@ import { AgentDecisionEntity } from '../domain/agent-decision.entity';
 import {
   AgentDecisionsRepository,
   CreateAgentDecisionData,
+  FindLatestAgentDecisionQuery,
 } from '../domain/agent-decisions.repository';
 
 @Injectable()
@@ -28,6 +29,23 @@ export class PrismaAgentDecisionsRepository implements AgentDecisionsRepository 
 
   async findById(id: string): Promise<AgentDecisionEntity | null> {
     const decision = await this.prisma.agentDecision.findUnique({ where: { id } });
+    return decision ? this.toEntity(decision) : null;
+  }
+
+  async findLatest(query: FindLatestAgentDecisionQuery): Promise<AgentDecisionEntity | null> {
+    const decision = await this.prisma.agentDecision.findFirst({
+      where: {
+        agentType: query.agentType,
+        instrumentId: query.instrumentId,
+        metadata: query.timeframe
+          ? {
+              path: ['timeframe'],
+              equals: query.timeframe,
+            }
+          : undefined,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
     return decision ? this.toEntity(decision) : null;
   }
 

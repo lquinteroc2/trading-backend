@@ -44,6 +44,9 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@trading.local}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
+      TECHNICAL_AGENT_BASE_URL: http://technical-agent-worker:8000
+      TECHNICAL_ANALYSIS_MIN_CANDLES: ${TECHNICAL_ANALYSIS_MIN_CANDLES:-200}
+      TECHNICAL_ANALYSIS_DEFAULT_LIMIT: ${TECHNICAL_ANALYSIS_DEFAULT_LIMIT:-1000}
     ports:
       - "3000:3000"
     depends_on:
@@ -51,6 +54,17 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      technical-agent-worker:
+        condition: service_started
+
+  technical-agent-worker:
+    build: ./services/agents
+    container_name: trading-technical-agent-worker
+    restart: unless-stopped
+    environment:
+      PYTHON_ENV: ${PYTHON_ENV:-development}
+    ports:
+      - "8000:8000"
 
 volumes:
   postgres_data:
