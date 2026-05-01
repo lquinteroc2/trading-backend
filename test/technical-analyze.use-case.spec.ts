@@ -1,6 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AgentDecisionAction, AgentType, MarketType, Timeframe } from '@prisma/client';
+import {
+  AgentDecisionAction,
+  AgentExecutionSource,
+  AgentType,
+  MarketType,
+  Timeframe,
+} from '@prisma/client';
 import { TechnicalAnalyzeUseCase } from '@/modules/agents/application/technical-analyze.use-case';
 import { AgentDecisionsRepository } from '@/modules/agents/domain/agent-decisions.repository';
 import { TechnicalAnalysisProvider } from '@/modules/agents/domain/technical-analysis-provider.interface';
@@ -53,6 +59,7 @@ describe('TechnicalAnalyzeUseCase', () => {
         instrumentId: instrument.id,
         signalId: null,
         decision: AgentDecisionAction.APPROVE,
+        executionSource: AgentExecutionSource.MANUAL,
         confidenceScore: 80,
         reasoning: null,
         metadata: null,
@@ -122,6 +129,7 @@ describe('TechnicalAnalyzeUseCase', () => {
         agentType: AgentType.TECHNICAL,
         instrumentId: instrument.id,
         decision: AgentDecisionAction.APPROVE,
+        executionSource: AgentExecutionSource.MANUAL,
         confidenceScore: 80,
         metadata: expect.objectContaining({
           indicators: expect.objectContaining({ rsi14: 55 }),

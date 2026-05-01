@@ -23,6 +23,20 @@ export default () => ({
   technicalAgent: {
     baseUrl: process.env.TECHNICAL_AGENT_BASE_URL ?? 'http://localhost:8000',
     minCandles: parseInt(process.env.TECHNICAL_ANALYSIS_MIN_CANDLES ?? '200', 10),
-    defaultLimit: parseInt(process.env.TECHNICAL_ANALYSIS_DEFAULT_LIMIT ?? '1000', 10),
+    defaultLimit: parseInt(
+      process.env.TECHNICAL_ANALYSIS_DEFAULT_LIMIT ??
+        process.env.TECHNICAL_ANALYSIS_CANDLES_LIMIT ??
+        '500',
+      10,
+    ),
+    timeoutMs: parseInt(process.env.TECHNICAL_ANALYSIS_TIMEOUT_MS ?? '8000', 10),
+    queueConcurrency: parseInt(process.env.TECHNICAL_ANALYSIS_QUEUE_CONCURRENCY ?? '5', 10),
+    queueDebounceMs: parseInt(process.env.TECHNICAL_ANALYSIS_QUEUE_DEBOUNCE_MS ?? '30000', 10),
+  },
+  signals: {
+    minConfidence: parseInt(process.env.SIGNAL_MIN_CONFIDENCE ?? '50', 10),
+    atrStopLossMultiplier: parseFloat(process.env.SIGNAL_ATR_SL_MULTIPLIER ?? '1.5'),
+    atrTakeProfitMultiplier: parseFloat(process.env.SIGNAL_ATR_TP_MULTIPLIER ?? '3'),
+    queueConcurrency: parseInt(process.env.SIGNAL_GENERATION_QUEUE_CONCURRENCY ?? '5', 10),
   },
 });

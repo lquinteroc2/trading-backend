@@ -1,4 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { InternalEventBus } from '@/events/internal-event-bus.service';
+import { TRADING_EVENTS } from '@/events/trading-events';
 import { TOKENS } from '@/shared/tokens';
 import {
   CreateMarketCandleData,
@@ -17,10 +19,20 @@ export class MarketDataService {
     private readonly candlesRepository: MarketCandlesRepository,
     @Inject(TOKENS.MARKET_DATA_SYNC_JOBS_REPOSITORY)
     private readonly syncJobsRepository: MarketDataSyncJobsRepository,
+    private readonly eventBus: InternalEventBus,
   ) {}
 
-  createCandle(data: CreateMarketCandleData) {
-    return this.candlesRepository.create(data);
+  async createCandle(data: CreateMarketCandleData) {
+    const candle = await this.candlesRepository.create(data);
+    this.eventBus.emit(TRADING_EVENTS.CANDLE_CREATED, candle);
+    this.eventBus.emit(TRADING_EVENTS.CANDLE_CLOSED, {
+      instrumentId: candle.instrumentId,
+      timeframe: candle.timeframe,
+      candleTimestamp: candle.timestamp,
+      source: data.source.toUpperCase() === 'REALTIME' ? 'REALTIME' : 'MANUAL',
+      triggerAnalysis: true,
+    });
+    return candle;
   }
 
   createBulk(data: CreateMarketCandleData[]) {

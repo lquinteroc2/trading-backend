@@ -74,6 +74,7 @@ export class MarketDataSyncController {
       endTime: dto.endTime ? new Date(dto.endTime) : undefined,
       limit: dto.limit,
       provider: dto.provider,
+      triggerAnalysis: dto.triggerAnalysis,
     };
   }
 }

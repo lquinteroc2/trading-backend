@@ -20,7 +20,11 @@ export class SignalsController {
 
   @Get()
   findMany(@Query() query: FindSignalsDto) {
-    return this.signalsService.findMany(query);
+    return this.signalsService.findMany({
+      ...query,
+      from: query.from ? new Date(query.from) : undefined,
+      to: query.to ? new Date(query.to) : undefined,
+    });
   }
 
   @Get(':id')

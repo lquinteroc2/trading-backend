@@ -4,6 +4,7 @@ import { TOKENS } from '@/shared/tokens';
 import {
   CreateTradingSignalData,
   FindSignalsQuery,
+  SignalCandleKey,
   TradingSignalsRepository,
 } from '../domain/trading-signals.repository';
 
@@ -20,6 +21,10 @@ export class SignalsService {
 
   findMany(query: FindSignalsQuery) {
     return this.signalsRepository.findMany(query);
+  }
+
+  findByCandleKey(key: SignalCandleKey) {
+    return this.signalsRepository.findByCandleKey(key);
   }
 
   async findById(id: string) {

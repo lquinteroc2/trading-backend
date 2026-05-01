@@ -66,6 +66,44 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   TECHNICAL_ANALYSIS_DEFAULT_LIMIT?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  TECHNICAL_ANALYSIS_CANDLES_LIMIT?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  TECHNICAL_ANALYSIS_TIMEOUT_MS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  TECHNICAL_ANALYSIS_QUEUE_CONCURRENCY?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  TECHNICAL_ANALYSIS_QUEUE_DEBOUNCE_MS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  SIGNAL_MIN_CONFIDENCE?: number;
+
+  @IsOptional()
+  @Min(0)
+  SIGNAL_ATR_SL_MULTIPLIER?: number;
+
+  @IsOptional()
+  @Min(0)
+  SIGNAL_ATR_TP_MULTIPLIER?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  SIGNAL_GENERATION_QUEUE_CONCURRENCY?: number;
 }
 
 export function validateConfig(config: Record<string, unknown>) {

@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSyncStatus, Timeframe } from '@prisma/client';
+import { InternalEventBus } from '@/events/internal-event-bus.service';
+import { TRADING_EVENTS } from '@/events/trading-events';
 import { TOKENS } from '@/shared/tokens';
 import { InstrumentsRepository } from '@/modules/instruments/domain/instruments.repository';
 import { CreateMarketCandleData, MarketCandlesRepository } from '../domain/market-candles.repository';
@@ -21,6 +23,7 @@ export type SyncHistoricalCandlesInput = {
   limit?: number;
   provider?: string;
   syncJobId?: string;
+  triggerAnalysis?: boolean;
 };
 
 export type SyncHistoricalCandlesOutput = {
@@ -63,6 +66,7 @@ export class SyncHistoricalCandlesUseCase {
     @Inject(TOKENS.MARKET_DATA_PROVIDERS)
     private readonly providers: MarketDataProvider[],
     private readonly config: ConfigService,
+    private readonly eventBus: InternalEventBus,
   ) {}
 
   async execute(input: SyncHistoricalCandlesInput): Promise<SyncHistoricalCandlesOutput> {
@@ -126,6 +130,19 @@ export class SyncHistoricalCandlesUseCase {
       this.logger.log(
         `Synced ${candles.length} ${symbol} ${input.timeframe} candles from ${provider.getName()}`,
       );
+
+      if (input.triggerAnalysis && insertedCount > 0) {
+        const latestInsertedCandle = sortedCandles.at(-1);
+        if (latestInsertedCandle) {
+          this.eventBus.emit(TRADING_EVENTS.CANDLE_CLOSED, {
+            instrumentId: instrument.id,
+            timeframe: input.timeframe,
+            candleTimestamp: latestInsertedCandle.timestamp,
+            source: 'SYNC',
+            triggerAnalysis: true,
+          });
+        }
+      }
 
       return {
         syncJobId: syncJob.id,

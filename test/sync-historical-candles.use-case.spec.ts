@@ -108,6 +108,7 @@ describe('SyncHistoricalCandlesUseCase', () => {
         syncJobs,
         [provider],
         config,
+        { emit: jest.fn() } as never,
       ),
       instruments,
       candles,

@@ -15,8 +15,13 @@ describe('AgentsController technical analysis endpoints', () => {
     const latest = {
       execute: jest.fn().mockResolvedValue({ id: 'decision-id' }),
     };
-    const queue = {
-      add: jest.fn().mockResolvedValue({ id: 'job-id' }),
+    const queueProducer = {
+      enqueueTechnicalAnalysis: jest.fn().mockResolvedValue({
+        jobId: 'job-id',
+        status: 'QUEUED',
+        symbol: 'BTCUSDT',
+        timeframe: Timeframe.M15,
+      }),
     };
 
     return {
@@ -24,11 +29,11 @@ describe('AgentsController technical analysis endpoints', () => {
         agentsService,
         technicalAnalyze as never,
         latest as never,
-        queue as never,
+        queueProducer as never,
       ),
       technicalAnalyze,
       latest,
-      queue,
+      queueProducer,
     };
   };
 
@@ -61,7 +66,12 @@ describe('AgentsController technical analysis endpoints', () => {
         timeframe: Timeframe.M15,
         limit: 1000,
       }),
-    ).resolves.toEqual({ jobId: 'job-id', status: 'QUEUED' });
+    ).resolves.toEqual({
+      jobId: 'job-id',
+      status: 'QUEUED',
+      symbol: 'BTCUSDT',
+      timeframe: Timeframe.M15,
+    });
   });
 
   it('returns the latest stored technical analysis', async () => {

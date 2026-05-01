@@ -1,4 +1,4 @@
-import { PrismaClient, MarketType, Role } from '@prisma/client';
+import { PrismaClient, MarketType, Role, StrategyStatus } from '@prisma/client';
 import bcryptjs from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -22,6 +22,41 @@ async function main() {
       { symbol: 'BTCUSDT', name: 'Bitcoin vs Tether', marketType: MarketType.CRYPTO, brokerSymbol: 'BTCUSDT' },
     ],
     skipDuplicates: true,
+  });
+
+  const emaTrendStrategy = await prisma.strategy.upsert({
+    where: { name: 'EMA_TREND_STRATEGY' },
+    update: { status: StrategyStatus.ACTIVE },
+    create: {
+      id: 'ema-trend-strategy',
+      name: 'EMA_TREND_STRATEGY',
+      description: 'EMA alignment strategy with RSI confirmation and ATR-based exits.',
+      status: StrategyStatus.ACTIVE,
+    },
+  });
+
+  await prisma.strategyVersion.upsert({
+    where: {
+      strategyId_version: {
+        strategyId: emaTrendStrategy.id,
+        version: 'v1',
+      },
+    },
+    update: { isActive: true },
+    create: {
+      id: 'ema-trend-strategy-v1',
+      strategyId: emaTrendStrategy.id,
+      version: 'v1',
+      isActive: true,
+      parameters: {
+        rsiBuyMin: 45,
+        rsiBuyMax: 70,
+        rsiSellMin: 30,
+        rsiSellMax: 55,
+        atrStableMaxPercentOfPrice: 5,
+        trendConsistencyCandles: 3,
+      },
+    },
   });
 }
 

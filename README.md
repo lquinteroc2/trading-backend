@@ -44,7 +44,11 @@ Variables de analisis tecnico de Sprint 3:
 ```env
 TECHNICAL_AGENT_BASE_URL=http://localhost:8000
 TECHNICAL_ANALYSIS_MIN_CANDLES=200
-TECHNICAL_ANALYSIS_DEFAULT_LIMIT=1000
+TECHNICAL_ANALYSIS_DEFAULT_LIMIT=500
+TECHNICAL_ANALYSIS_CANDLES_LIMIT=500
+TECHNICAL_ANALYSIS_TIMEOUT_MS=8000
+TECHNICAL_ANALYSIS_QUEUE_CONCURRENCY=5
+TECHNICAL_ANALYSIS_QUEUE_DEBOUNCE_MS=30000
 ```
 
 ## Ejecutar con Docker Compose
@@ -206,6 +210,10 @@ curl -X POST http://localhost:3000/api/v1/market-data/sync/enqueue \
   }'
 ```
 
+Para que un sync manual dispare un unico analisis tecnico al terminar, agrega
+`"triggerAnalysis": true`. Sin ese flag, los syncs masivos no encolan analisis para evitar cientos
+de jobs redundantes.
+
 Consultar velas guardadas:
 
 ```bash
@@ -279,6 +287,77 @@ curl -X POST http://localhost:3000/api/v1/agents/technical/analyze/enqueue \
   }'
 ```
 
+### Sprint 4: analisis tecnico automatico por eventos y colas
+
+El flujo automatico queda asi:
+
+```text
+MarketCandle creada -> CANDLE_CLOSED -> technical-analysis-queue
+-> TechnicalAnalysisProcessor -> worker Python -> AgentDecision
+```
+
+El `POST /market-data/candles` emite `CANDLE_CLOSED` y encola
+`technical-analysis.analyze` con debounce por `symbol + timeframe`. Los syncs historicos no disparan
+analisis salvo que envies `triggerAnalysis=true`; en ese caso se encola un solo job para la ultima
+vela sincronizada.
+
+Encolar manualmente un analisis:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/agents/technical/analyze/enqueue \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
+    "timeframe": "M15",
+    "limit": 500
+  }'
+```
+
+Ver estado de jobs:
+
+```bash
+curl http://localhost:3000/api/v1/queues/technical-analysis \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Simular una nueva vela y disparar el flujo automatico:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/market-data/candles \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
+    "timeframe": "M15",
+    "open": 42000,
+    "high": 42100,
+    "low": 41900,
+    "close": 42050,
+    "volume": 100,
+    "timestamp": "2026-05-01T12:00:00.000Z",
+    "source": "REALTIME"
+  }'
+```
+
+Ver logs del processor:
+
+```bash
+docker compose logs -f backend | grep technical_analysis_job
+```
+
+Forzar retries: detén el worker Python o configura `TECHNICAL_AGENT_BASE_URL` a una URL invalida y
+encola un analisis. Los errores HTTP/timeout se reintentan hasta 3 veces con backoff exponencial.
+Para ver un fallo no reintentable, encola un instrumento/timeframe con menos de
+`TECHNICAL_ANALYSIS_MIN_CANDLES`; el job queda fallido sin retry util.
+
+Ver decisiones guardadas:
+
+```bash
+docker compose exec postgres psql -U trading -d trading \
+  -c "select id, \"agentType\", \"executionSource\", decision, \"confidenceScore\", \"createdAt\" from \"AgentDecision\" order by \"createdAt\" desc limit 5;"
+```
+
 Consultar el ultimo analisis tecnico guardado:
 
 ```bash
@@ -291,6 +370,107 @@ Verificar persistencia en PostgreSQL:
 ```bash
 docker compose exec postgres psql -U trading -d trading \
   -c "select id, \"agentType\", decision, \"confidenceScore\", \"createdAt\" from \"AgentDecision\" where \"instrumentId\" = 'ID_DEL_INSTRUMENTO_BTCUSDT' order by \"createdAt\" desc limit 5;"
+```
+
+### Sprint 5: generacion de señales con EMA Trend Strategy
+
+El flujo automatico queda asi:
+
+```text
+candle -> technical-analysis-queue -> AgentDecision TECHNICAL
+-> signal-generation-queue -> StrategyEngine -> EMA_TREND_STRATEGY -> TradingSignal
+```
+
+La estrategia inicial es `EMA_TREND_STRATEGY` version `v1`. Genera `BUY` cuando
+`EMA20 > EMA50 > EMA200` y `RSI14` esta entre `45` y `70`; genera `SELL` cuando
+`EMA20 < EMA50 < EMA200` y `RSI14` esta entre `30` y `55`. Si las EMAs o RSI no
+confirman, retorna `NO_SIGNAL` y no guarda señal.
+
+Cada señal guarda:
+
+- `strategyId`
+- `timeframe`
+- `direction`
+- `entryPrice`
+- `stopLoss`
+- `takeProfit`
+- `confidenceScore`
+- `reason`
+- `candleTimestamp`
+
+Generar una señal manual desde el ultimo analisis tecnico:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/signals/generate \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
+    "timeframe": "M15"
+  }'
+```
+
+Consultar señales:
+
+```bash
+curl "http://localhost:3000/api/v1/signals?instrumentId=ID_DEL_INSTRUMENTO_BTCUSDT&timeframe=M15&status=CREATED" \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Consultar una señal puntual:
+
+```bash
+curl http://localhost:3000/api/v1/signals/SIGNAL_ID \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Ver jobs de generacion:
+
+```bash
+curl http://localhost:3000/api/v1/queues/signal-generation \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Evitar duplicados:
+
+La base de datos tiene una restriccion unica por
+`instrumentId + timeframe + candleTimestamp`. Antes de ejecutar la estrategia, el servicio busca si ya
+existe una señal para esa vela; si existe, responde `SKIPPED_DUPLICATE`.
+
+Ajustar parametros operativos:
+
+```env
+SIGNAL_MIN_CONFIDENCE=50
+SIGNAL_ATR_SL_MULTIPLIER=1.5
+SIGNAL_ATR_TP_MULTIPLIER=3
+SIGNAL_GENERATION_QUEUE_CONCURRENCY=5
+```
+
+Los parametros versionados de estrategia viven en `StrategyVersion.parameters`; para `v1` incluyen
+rangos RSI, limite de ATR estable y numero de velas usadas para confirmar consistencia de tendencia.
+
+Ejemplo completo BTCUSDT:
+
+```bash
+# 1. Sincroniza velas con triggerAnalysis=true para disparar analisis y señal
+curl -X POST http://localhost:3000/api/v1/market-data/sync \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
+    "timeframe": "M15",
+    "startTime": "2026-04-25T00:00:00.000Z",
+    "limit": 500,
+    "triggerAnalysis": true
+  }'
+
+# 2. Revisa el ultimo analisis tecnico
+curl "http://localhost:3000/api/v1/agents/technical/latest?instrumentId=ID_DEL_INSTRUMENTO_BTCUSDT&timeframe=M15" \
+  -H "Authorization: Bearer TOKEN"
+
+# 3. Revisa la señal creada
+curl "http://localhost:3000/api/v1/signals?instrumentId=ID_DEL_INSTRUMENTO_BTCUSDT&timeframe=M15" \
+  -H "Authorization: Bearer TOKEN"
 ```
 
 Calcular riesgo:
@@ -318,6 +498,7 @@ src/
     instruments/
     market-data/
     signals/
+    strategies/
     agents/
     risk/
     paper-trading/
@@ -330,9 +511,9 @@ Cada modulo de negocio separa:
 - `infrastructure`: adaptadores concretos, por ahora Prisma.
 - `presentation`: controllers y DTOs HTTP.
 
-## Listo para Sprint 4
+## Listo para Sprint 6
 
-- Convertir lecturas tecnicas en señales candidatas sin operar dinero real.
 - Agregar backtesting sobre velas e indicadores persistidos.
+- Medir performance por estrategia/version sin ejecutar trades reales.
 - Profundizar agentes tecnicos/fundamentales/riesgo sobre las interfaces existentes.
 - Integrar brokers en modo sandbox antes de cualquier ejecucion real.

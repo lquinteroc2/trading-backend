@@ -23,6 +23,7 @@ describe('SignalsService', () => {
     create: jest.fn().mockResolvedValue(signal),
     findMany: jest.fn().mockResolvedValue([signal]),
     findById: jest.fn().mockResolvedValue(signal),
+    findByCandleKey: jest.fn().mockResolvedValue(signal),
     updateStatus: jest.fn().mockResolvedValue({ ...signal, status: SignalStatus.APPROVED }),
   });
 

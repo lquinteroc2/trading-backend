@@ -1,4 +1,4 @@
-import { AgentDecisionAction, AgentType } from '@prisma/client';
+import { AgentDecisionAction, AgentExecutionSource, AgentType } from '@prisma/client';
 import { AgentDecisionEntity } from './agent-decision.entity';
 
 export type CreateAgentDecisionData = {
@@ -6,6 +6,7 @@ export type CreateAgentDecisionData = {
   instrumentId: string;
   signalId?: string;
   decision: AgentDecisionAction;
+  executionSource?: AgentExecutionSource;
   confidenceScore: number;
   reasoning?: string;
   metadata?: unknown;

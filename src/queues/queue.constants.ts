@@ -10,4 +10,5 @@ export const QUEUE_NAMES = {
 export const QUEUE_JOBS = {
   SYNC_HISTORICAL_CANDLES: 'sync-historical-candles',
   TECHNICAL_ANALYSIS_ANALYZE: 'technical-analysis.analyze',
+  SIGNAL_GENERATE: 'signal.generate',
 } as const;

@@ -34,15 +34,23 @@ enum Timeframe {
 enum SignalDirection {
   BUY
   SELL
+  NONE
   NEUTRAL
 }
 
 enum SignalStatus {
+  CREATED
+  UNDER_REVIEW
   PENDING
   APPROVED
   REJECTED
-  EXECUTED
   EXPIRED
+  EXECUTED
+}
+
+enum StrategyStatus {
+  ACTIVE
+  INACTIVE
 }
 
 enum SourceAgent {
@@ -66,6 +74,11 @@ enum AgentDecisionAction {
   REJECT
   WAIT
   MODIFY
+}
+
+enum AgentExecutionSource {
+  QUEUE
+  MANUAL
 }
 
 enum TradeDirection {
@@ -165,21 +178,51 @@ model MarketDataSyncJob {
 model TradingSignal {
   id              String           @id @default(uuid())
   instrumentId    String
+  strategyId      String?
+  timeframe       Timeframe?
   direction       SignalDirection
   entryPrice      Decimal          @db.Decimal(20, 8)
   stopLoss        Decimal?         @db.Decimal(20, 8)
   takeProfit      Decimal?         @db.Decimal(20, 8)
   confidenceScore Int
-  status          SignalStatus     @default(PENDING)
+  status          SignalStatus     @default(CREATED)
   sourceAgent     SourceAgent
+  candleTimestamp DateTime?
+  reason          String?
   reasoning       String?
   createdAt       DateTime         @default(now())
   expiresAt       DateTime?
   instrument      Instrument       @relation(fields: [instrumentId], references: [id])
+  strategy        Strategy?        @relation(fields: [strategyId], references: [id])
   decisions       AgentDecision[]
   paperTrades     PaperTrade[]
 
   @@index([instrumentId, status, createdAt])
+  @@index([strategyId, createdAt])
+  @@unique([instrumentId, timeframe, candleTimestamp])
+}
+
+model Strategy {
+  id           String            @id @default(uuid())
+  name         String            @unique
+  description  String
+  status       StrategyStatus    @default(ACTIVE)
+  createdAt    DateTime          @default(now())
+  versions     StrategyVersion[]
+  signals      TradingSignal[]
+}
+
+model StrategyVersion {
+  id         String   @id @default(uuid())
+  strategyId String
+  version    String
+  parameters Json
+  isActive   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  strategy   Strategy @relation(fields: [strategyId], references: [id])
+
+  @@unique([strategyId, version])
+  @@index([strategyId, isActive])
 }
 
 model AgentDecision {
@@ -188,6 +231,7 @@ model AgentDecision {
   instrumentId    String
   signalId        String?
   decision        AgentDecisionAction
+  executionSource AgentExecutionSource @default(MANUAL)
   confidenceScore Int
   reasoning       String?
   metadata        Json?

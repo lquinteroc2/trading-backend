@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { QUEUE_NAMES } from '@/queues/queue.constants';
+import { QueuesModule } from '@/queues/queues.module';
 import { TOKENS } from '@/shared/tokens';
 import { InstrumentsModule } from '../instruments/instruments.module';
 import { PrismaMarketCandlesRepository } from '../market-data/infrastructure/prisma-market-candles.repository';
@@ -13,7 +14,11 @@ import { TechnicalAnalysisProcessor } from './infrastructure/technical-analysis.
 import { AgentsController } from './presentation/agents.controller';
 
 @Module({
-  imports: [InstrumentsModule, BullModule.registerQueue({ name: QUEUE_NAMES.TECHNICAL_ANALYSIS })],
+  imports: [
+    InstrumentsModule,
+    QueuesModule,
+    BullModule.registerQueue({ name: QUEUE_NAMES.TECHNICAL_ANALYSIS }),
+  ],
   controllers: [AgentsController],
   providers: [
     AgentsService,

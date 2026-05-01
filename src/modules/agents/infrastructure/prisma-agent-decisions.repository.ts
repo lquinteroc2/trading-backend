@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AgentDecisionAction, AgentType, Prisma } from '@prisma/client';
+import { AgentDecisionAction, AgentExecutionSource, AgentType, Prisma } from '@prisma/client';
 import { PrismaService } from '@/database/prisma.service';
 import { AgentDecisionEntity } from '../domain/agent-decision.entity';
 import {
@@ -55,6 +55,7 @@ export class PrismaAgentDecisionsRepository implements AgentDecisionsRepository 
     instrumentId: string;
     signalId: string | null;
     decision: AgentDecisionAction;
+    executionSource: AgentExecutionSource;
     confidenceScore: number;
     reasoning: string | null;
     metadata: Prisma.JsonValue | null;
@@ -66,6 +67,7 @@ export class PrismaAgentDecisionsRepository implements AgentDecisionsRepository 
       decision.instrumentId,
       decision.signalId,
       decision.decision,
+      decision.executionSource,
       decision.confidenceScore,
       decision.reasoning,
       decision.metadata,

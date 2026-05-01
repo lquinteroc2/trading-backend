@@ -1,6 +1,8 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { AgentDecisionAction, AgentType, Timeframe } from '@prisma/client';
+import { AgentDecisionAction, AgentExecutionSource, AgentType, Timeframe } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
+import { InternalEventBus } from '@/events/internal-event-bus.service';
+import { TRADING_EVENTS } from '@/events/trading-events';
 import { TOKENS } from '@/shared/tokens';
 import { InstrumentsRepository } from '@/modules/instruments/domain/instruments.repository';
 import { MarketCandlesRepository } from '@/modules/market-data/domain/market-candles.repository';
@@ -14,6 +16,7 @@ export type TechnicalAnalyzeParams = {
   instrumentId: string;
   timeframe: Timeframe;
   limit?: number;
+  executionSource?: AgentExecutionSource;
 };
 
 export type TechnicalAnalyzeOutput = TechnicalAnalysisResult & {
@@ -33,6 +36,7 @@ export class TechnicalAnalyzeUseCase {
     @Inject(TOKENS.TECHNICAL_ANALYSIS_PROVIDER)
     private readonly technicalAnalysisProvider: TechnicalAnalysisProvider,
     private readonly config: ConfigService,
+    private readonly eventBus?: InternalEventBus,
   ) {}
 
   async execute(params: TechnicalAnalyzeParams): Promise<TechnicalAnalyzeOutput> {
@@ -83,6 +87,7 @@ export class TechnicalAnalyzeUseCase {
       agentType: AgentType.TECHNICAL,
       instrumentId: params.instrumentId,
       decision: decisionAction,
+      executionSource: params.executionSource ?? AgentExecutionSource.MANUAL,
       confidenceScore: result.confidenceScore,
       reasoning: result.reasoning.join('\n'),
       metadata: {
@@ -92,8 +97,16 @@ export class TechnicalAnalyzeUseCase {
         trend: result.trend,
         technicalBias: result.technicalBias,
         indicators: result.indicators,
+        rawResponse: result,
         warnings: result.warnings,
       },
+    });
+
+    this.eventBus?.emit(TRADING_EVENTS.TECHNICAL_ANALYSIS_COMPLETED, {
+      agentDecisionId: decision.id,
+      instrumentId: params.instrumentId,
+      timeframe: params.timeframe,
+      symbol: instrument.symbol,
     });
 
     return {

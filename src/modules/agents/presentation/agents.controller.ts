@@ -1,12 +1,9 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
 import { ApiTags } from '@nestjs/swagger';
-import { Queue } from 'bullmq';
-import { QUEUE_JOBS, QUEUE_NAMES } from '@/queues/queue.constants';
+import { TechnicalAnalysisQueueProducer } from '@/queues/technical-analysis-queue.producer';
 import { AgentsService } from '../application/agents.service';
 import { GetLatestTechnicalAnalysisUseCase } from '../application/get-latest-technical-analysis.use-case';
 import { TechnicalAnalyzeUseCase } from '../application/technical-analyze.use-case';
-import { TechnicalAnalysisJobPayload } from '../infrastructure/technical-analysis.processor';
 import { AnalyzeTechnicalDto } from './dto/analyze-technical.dto';
 import { CreateAgentDecisionDto } from './dto/create-agent-decision.dto';
 import { LatestTechnicalAnalysisDto } from './dto/latest-technical-analysis.dto';
@@ -18,8 +15,7 @@ export class AgentsController {
     private readonly agentsService: AgentsService,
     private readonly technicalAnalyze: TechnicalAnalyzeUseCase,
     private readonly getLatestTechnicalAnalysis: GetLatestTechnicalAnalysisUseCase,
-    @InjectQueue(QUEUE_NAMES.TECHNICAL_ANALYSIS)
-    private readonly technicalAnalysisQueue: Queue<TechnicalAnalysisJobPayload>,
+    private readonly technicalAnalysisQueueProducer: TechnicalAnalysisQueueProducer,
   ) {}
 
   @Post('technical/analyze')
@@ -29,8 +25,11 @@ export class AgentsController {
 
   @Post('technical/analyze/enqueue')
   async enqueueTechnicalAnalysis(@Body() dto: AnalyzeTechnicalDto) {
-    const job = await this.technicalAnalysisQueue.add(QUEUE_JOBS.TECHNICAL_ANALYSIS_ANALYZE, dto);
-    return { jobId: job.id, status: 'QUEUED' };
+    return this.technicalAnalysisQueueProducer.enqueueTechnicalAnalysis({
+      ...dto,
+      executionSource: 'MANUAL',
+      force: true,
+    });
   }
 
   @Get('technical/latest')

@@ -13,6 +13,7 @@ export type HistoricalMarketDataSyncJobPayload = {
   endTime?: string;
   limit?: number;
   provider?: string;
+  triggerAnalysis?: boolean;
 };
 
 @Processor(QUEUE_NAMES.HISTORICAL_MARKET_DATA_SYNC)
@@ -38,6 +39,7 @@ export class HistoricalMarketDataSyncProcessor extends WorkerHost {
       endTime: payload.endTime ? new Date(payload.endTime) : undefined,
       limit: payload.limit,
       provider: payload.provider,
+      triggerAnalysis: payload.triggerAnalysis,
     });
   }
 }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { QUEUE_NAMES } from '@/queues/queue.constants';
+import { QueuesModule } from '@/queues/queues.module';
 import { TOKENS } from '@/shared/tokens';
 import { InstrumentsModule } from '../instruments/instruments.module';
 import { MarketDataService } from './application/market-data.service';
@@ -15,6 +16,7 @@ import { MarketDataSyncController } from './presentation/market-data-sync.contro
 @Module({
   imports: [
     InstrumentsModule,
+    QueuesModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.HISTORICAL_MARKET_DATA_SYNC }),
   ],
   controllers: [MarketDataController, MarketDataSyncController],
