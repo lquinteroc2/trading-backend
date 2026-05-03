@@ -28,8 +28,8 @@ describe('PythonTechnicalAnalysisProvider', () => {
         technicalBias: 'BULLISH',
         confidenceScore: 80,
         indicators: { ema20: 10, ema50: 9, ema200: 8, rsi14: 55, atr14: 1 },
-        reasoning: ['EMA20 is above EMA50 and EMA50 is above EMA200'],
-        warnings: [],
+        reasoning: ['EMA20 esta por encima de EMA50 y EMA50 esta por encima de EMA200'],
+        warnings: ['El ATR es muy alto en relacion con el precio'],
       }),
     } as Response);
 
@@ -64,6 +64,8 @@ describe('PythonTechnicalAnalysisProvider', () => {
     });
     expect(result.technicalBias).toBe('BULLISH');
     expect(result.indicators.rsi14).toBe(55);
+    expect(result.reasoning).toEqual(['EMA20 esta por encima de EMA50 y EMA50 esta por encima de EMA200']);
+    expect(result.warnings).toEqual(['El ATR es muy alto en relacion con el precio']);
   });
 
   it('handles worker HTTP errors', async () => {

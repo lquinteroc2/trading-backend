@@ -94,24 +94,24 @@ class TechnicalAnalysisService:
     ) -> list[str]:
         reasoning: list[str] = []
         if trend == MarketDirection.BULLISH:
-            reasoning.append("EMA20 is above EMA50 and EMA50 is above EMA200")
+            reasoning.append("EMA20 esta por encima de EMA50 y EMA50 esta por encima de EMA200")
         elif trend == MarketDirection.BEARISH:
-            reasoning.append("EMA20 is below EMA50 and EMA50 is below EMA200")
+            reasoning.append("EMA20 esta por debajo de EMA50 y EMA50 esta por debajo de EMA200")
         else:
-            reasoning.append("EMAs are not clearly aligned")
+            reasoning.append("Las medias moviles no estan claramente alineadas")
 
         if technical_bias == MarketDirection.BULLISH and 45 <= rsi14 <= 70:
-            reasoning.append("RSI is in a healthy bullish range")
+            reasoning.append("El RSI se mantiene en un rango alcista saludable")
         elif technical_bias == MarketDirection.BEARISH and 30 <= rsi14 <= 55:
-            reasoning.append("RSI confirms bearish directional momentum")
+            reasoning.append("El RSI confirma momentum direccional bajista")
         else:
-            reasoning.append("RSI does not confirm directional momentum")
+            reasoning.append("El RSI no confirma momentum direccional")
 
         atr_ratio = atr14 / latest_close if latest_close > 0 else 0
         if 0.001 <= atr_ratio <= 0.08:
-            reasoning.append("ATR indicates measurable volatility")
+            reasoning.append("El ATR indica volatilidad medible")
         else:
-            reasoning.append("ATR is outside the preferred volatility range")
+            reasoning.append("El ATR esta fuera del rango de volatilidad preferido")
 
         return reasoning
 
@@ -120,13 +120,13 @@ class TechnicalAnalysisService:
         atr_ratio = atr14 / latest_close if latest_close > 0 else 0
 
         if rsi14 > 75:
-            warnings.append("RSI indicates overbought conditions")
+            warnings.append("El RSI indica condiciones de sobrecompra")
         if rsi14 < 25:
-            warnings.append("RSI indicates oversold conditions")
+            warnings.append("El RSI indica condiciones de sobreventa")
         if atr_ratio < 0.001:
-            warnings.append("ATR is very low relative to price")
+            warnings.append("El ATR es muy bajo en relacion con el precio")
         if atr_ratio > 0.08:
-            warnings.append("ATR is very high relative to price")
+            warnings.append("El ATR es muy alto en relacion con el precio")
 
         return warnings
 
