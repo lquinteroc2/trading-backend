@@ -33,6 +33,40 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  JWT_ACCESS_EXPIRES_IN?: string;
+
+  @IsOptional()
+  @IsString()
+  JWT_REFRESH_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  JWT_REFRESH_EXPIRES_IN?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  JWT_ACCESS_COOKIE_MAX_AGE_MS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  JWT_REFRESH_COOKIE_MAX_AGE_MS?: number;
+
+  @IsOptional()
+  @IsString()
+  CORS_ORIGINS?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  COOKIE_SECURE?: boolean;
+
+  @IsOptional()
+  @IsString()
+  COOKIE_SAME_SITE?: string;
+
+  @IsOptional()
+  @IsString()
   REDIS_HOST?: string;
 
   @IsOptional()

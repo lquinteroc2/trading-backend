@@ -5,7 +5,23 @@ export default () => ({
   },
   jwt: {
     secret: process.env.JWT_SECRET ?? 'change-me',
-    expiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
+    refreshSecret: process.env.JWT_REFRESH_SECRET ?? process.env.JWT_SECRET ?? 'change-me',
+    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? process.env.JWT_EXPIRES_IN ?? '15m',
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
+    expiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? process.env.JWT_EXPIRES_IN ?? '15m',
+    accessCookieMaxAgeMs: parseInt(process.env.JWT_ACCESS_COOKIE_MAX_AGE_MS ?? '900000', 10),
+    refreshCookieMaxAgeMs: parseInt(process.env.JWT_REFRESH_COOKIE_MAX_AGE_MS ?? '604800000', 10),
+  },
+  security: {
+    corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3001')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+    cookieSecure:
+      (process.env.COOKIE_SECURE ?? (process.env.NODE_ENV === 'production' ? 'true' : 'false'))
+        .toLowerCase()
+        .trim() === 'true',
+    cookieSameSite: (process.env.COOKIE_SAME_SITE ?? 'lax') as 'lax' | 'strict' | 'none',
   },
   redis: {
     host: process.env.REDIS_HOST ?? 'localhost',
