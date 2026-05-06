@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import {
   AgentDecisionAction,
   AgentExecutionSource,
@@ -12,8 +12,15 @@ import {
 } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/database/prisma.service';
+import { InternalEventBus } from '@/events/internal-event-bus.service';
+import { TRADING_EVENTS } from '@/events/trading-events';
 import { SystemConfigService } from '@/modules/system/application/system-config.service';
 import { SignalsService } from '@/modules/signals/application/signals.service';
+import { AssistedTradingService } from '@/modules/assisted-trading/application/assisted-trading.service';
+import {
+  FundamentalAgentService,
+  FundamentalEvaluationResult,
+} from '@/modules/fundamental/application/fundamental-agent.service';
 import {
   SupervisorAccountState,
   SupervisorRiskInput,
@@ -37,6 +44,11 @@ export class SupervisorAgentService {
     private readonly signalsService: SignalsService,
     private readonly systemConfig: SystemConfigService,
     private readonly config: ConfigService,
+    private readonly fundamentalAgent: FundamentalAgentService,
+    @Optional()
+    private readonly assistedTrading?: AssistedTradingService,
+    @Optional()
+    private readonly eventBus?: InternalEventBus,
   ) {}
 
   decide(
@@ -44,6 +56,7 @@ export class SupervisorAgentService {
     riskDecision: SupervisorRiskInput,
     accountState: SupervisorAccountState,
     systemConfig: SupervisorSystemConfig,
+    fundamentalDecision?: FundamentalEvaluationResult,
   ): SupervisorRuleResult {
     const minConfidence = this.config.get<number>('supervisor.minConfidence', 70);
     const maxOpenTrades = this.config.get<number>('supervisor.maxOpenTrades', 1);
@@ -69,11 +82,17 @@ export class SupervisorAgentService {
     if (systemConfig.killSwitch) {
       blockReasons.push('Kill switch is active');
     }
-    if (systemConfig.mode !== SystemMode.PAPER_TRADING) {
+    if (
+      systemConfig.mode !== SystemMode.PAPER_TRADING &&
+      systemConfig.mode !== SystemMode.ASSISTED_TRADING
+    ) {
       blockReasons.push(`System mode ${systemConfig.mode} does not allow trading`);
     }
     if (riskDecision.decision !== RiskAssessmentDecision.APPROVED) {
       blockReasons.push(`Risk decision is ${riskDecision.decision}`);
+    }
+    if (fundamentalDecision?.decision === 'BLOCK') {
+      blockReasons.push(`Fundamental decision is BLOCK: ${fundamentalDecision.reason}`);
     }
     if (signal.confidenceScore < 50) {
       blockReasons.push(`Signal confidence ${signal.confidenceScore} is below 50`);
@@ -129,7 +148,42 @@ export class SupervisorAgentService {
     const riskDecision = await this.getLatestRiskAssessment(signalId);
     const accountState = await this.getAccountState(signal.instrumentId);
     const systemConfig = await this.systemConfig.getConfig();
-    const result = this.decide(signal, riskDecision, accountState, systemConfig);
+    const instrument = await this.prisma.instrument.findUnique({ where: { id: signal.instrumentId } });
+    const fundamentalCurrency = this.resolveFundamentalCurrency(instrument?.symbol ?? '');
+    const fundamentalDecision = fundamentalCurrency
+      ? await this.fundamentalAgent.evaluate({
+          currency: fundamentalCurrency,
+          timestamp: new Date(),
+        })
+      : this.buildNonUsdFundamentalAllow();
+    const fundamentalAgentDecision = await this.prisma.agentDecision.create({
+      data: {
+        agentType: AgentType.FUNDAMENTAL,
+        instrumentId: signal.instrumentId,
+        signalId: signal.id,
+        decision:
+          fundamentalDecision.decision === 'BLOCK'
+            ? AgentDecisionAction.REJECT
+            : AgentDecisionAction.APPROVE,
+        executionSource,
+        confidenceScore: fundamentalDecision.decision === 'BLOCK' ? 0 : 100,
+        reasoning: fundamentalDecision.reason,
+        metadata: {
+          currency: fundamentalDecision.currency,
+          decision: fundamentalDecision.decision,
+          windowBeforeMinutes: fundamentalDecision.windowBeforeMinutes,
+          windowAfterMinutes: fundamentalDecision.windowAfterMinutes,
+          blockingEvent: fundamentalDecision.blockingEvent,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    const result = this.decide(
+      signal,
+      riskDecision,
+      accountState,
+      systemConfig,
+      fundamentalDecision,
+    );
 
     const supervisorDecision = await this.prisma.supervisorDecision.create({
       data: {
@@ -152,13 +206,23 @@ export class SupervisorAgentService {
         reasoning: result.reason,
         metadata: {
           supervisorDecisionId: supervisorDecision.id,
+          fundamentalAgentDecisionId: fundamentalAgentDecision.id,
           ...result.metadata,
         } as Prisma.InputJsonValue,
       },
     });
 
-    if (result.decision === SupervisorDecisionAction.OPERATE) {
+    if (result.decision === SupervisorDecisionAction.OPERATE && systemConfig.mode === SystemMode.PAPER_TRADING) {
       await this.signalsService.updateStatus(signal.id, SignalStatus.APPROVED);
+    } else if (
+      result.decision === SupervisorDecisionAction.OPERATE &&
+      systemConfig.mode === SystemMode.ASSISTED_TRADING
+    ) {
+      await this.assistedTrading?.markSignalPendingManualApproval(
+        signal.id,
+        supervisorDecision.id,
+        result.reason,
+      );
     }
 
     this.logger.log(
@@ -171,9 +235,26 @@ export class SupervisorAgentService {
       }),
     );
 
+    this.eventBus?.emit(TRADING_EVENTS.SUPERVISOR_DECIDED, {
+      signalId: signal.id,
+      agentDecisionId: agentDecision.id,
+      supervisorDecisionId: supervisorDecision.id,
+      decision: result.decision,
+      reason: result.reason,
+    });
+
+    if (fundamentalDecision.decision === 'BLOCK') {
+      this.eventBus?.emit(TRADING_EVENTS.SUPERVISOR_BLOCKED_BY_FUNDAMENTAL, {
+        signalId: signal.id,
+        supervisorDecisionId: supervisorDecision.id,
+        economicEventId: fundamentalDecision.blockingEvent?.id,
+      });
+    }
+
     return {
       supervisorDecision,
       agentDecisionId: agentDecision.id,
+      systemMode: systemConfig.mode,
     };
   }
 
@@ -238,6 +319,26 @@ export class SupervisorAgentService {
     const date = new Date();
     date.setHours(0, 0, 0, 0);
     return date;
+  }
+
+  private resolveFundamentalCurrency(symbol: string): string | null {
+    const normalized = symbol.toUpperCase();
+    if (normalized.includes('USD') || normalized.includes('USDT') || normalized.includes('USDC')) {
+      return 'USD';
+    }
+    return null;
+  }
+
+  private buildNonUsdFundamentalAllow(): FundamentalEvaluationResult {
+    return {
+      decision: 'ALLOW',
+      currency: 'N/A',
+      windowBeforeMinutes: this.fundamentalAgent.windowBeforeMinutes,
+      windowAfterMinutes: this.fundamentalAgent.windowAfterMinutes,
+      blockingEvent: null,
+      reason: 'Instrumento sin exposición USD para la regla fundamental inicial.',
+      createdAt: new Date(),
+    };
   }
 
   private toAgentDecisionAction(decision: SupervisorDecisionAction): AgentDecisionAction {

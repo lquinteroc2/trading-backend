@@ -51,6 +51,11 @@ services:
       TECHNICAL_ANALYSIS_TIMEOUT_MS: ${TECHNICAL_ANALYSIS_TIMEOUT_MS:-8000}
       TECHNICAL_ANALYSIS_QUEUE_CONCURRENCY: ${TECHNICAL_ANALYSIS_QUEUE_CONCURRENCY:-5}
       TECHNICAL_ANALYSIS_QUEUE_DEBOUNCE_MS: ${TECHNICAL_ANALYSIS_QUEUE_DEBOUNCE_MS:-30000}
+      ENABLE_LIVE_TRADING: ${ENABLE_LIVE_TRADING:-false}
+      BROKER_PROVIDER: ${BROKER_PROVIDER:-MT5}
+      MT5_WORKER_BASE_URL: ${MT5_WORKER_BASE_URL:-http://mt5-worker:8010}
+      MT5_DRY_RUN: ${MT5_DRY_RUN:-true}
+      MT5_REQUEST_TIMEOUT_MS: ${MT5_REQUEST_TIMEOUT_MS:-10000}
     ports:
       - "3000:3000"
     depends_on:
@@ -59,6 +64,8 @@ services:
       redis:
         condition: service_healthy
       technical-agent-worker:
+        condition: service_started
+      mt5-worker:
         condition: service_started
 
   technical-agent-worker:
@@ -69,6 +76,21 @@ services:
       PYTHON_ENV: ${PYTHON_ENV:-development}
     ports:
       - "8000:8000"
+
+  mt5-worker:
+    build: ./services/mt5-worker
+    container_name: trading-mt5-worker
+    restart: unless-stopped
+    environment:
+      ENABLE_LIVE_TRADING: ${ENABLE_LIVE_TRADING:-false}
+      MT5_DRY_RUN: ${MT5_DRY_RUN:-true}
+      MT5_LOGIN: ${MT5_LOGIN:-}
+      MT5_PASSWORD: ${MT5_PASSWORD:-}
+      MT5_SERVER: ${MT5_SERVER:-}
+      MT5_TERMINAL_PATH: ${MT5_TERMINAL_PATH:-}
+      MT5_REQUEST_TIMEOUT_MS: ${MT5_REQUEST_TIMEOUT_MS:-10000}
+    ports:
+      - "8010:8010"
 
 volumes:
   postgres_data:

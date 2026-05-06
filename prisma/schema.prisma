@@ -46,6 +46,11 @@ enum SignalStatus {
   REJECTED
   EXPIRED
   EXECUTED
+  PENDING_MANUAL_APPROVAL
+  MANUALLY_APPROVED
+  MANUALLY_REJECTED
+  EXECUTED_PAPER
+  DRY_RUN_EXECUTED
 }
 
 enum StrategyStatus {
@@ -67,6 +72,7 @@ enum AgentType {
   RISK
   EXECUTION
   SUPERVISOR
+  MANUAL
 }
 
 enum AgentDecisionAction {
@@ -136,9 +142,23 @@ enum SupervisorDecisionAction {
 }
 
 enum SystemMode {
+  RESEARCH
+  BACKTESTING
   PAPER_TRADING
+  ASSISTED_TRADING
   SAFE_MODE
   PAUSED
+}
+
+enum ManualTradingDecisionAction {
+  APPROVE
+  REJECT
+}
+
+enum ManualExecutionTarget {
+  PAPER_TRADING
+  MT5_DRY_RUN
+  NONE
 }
 
 enum DataSyncStatus {
@@ -146,6 +166,38 @@ enum DataSyncStatus {
   RUNNING
   COMPLETED
   FAILED
+}
+
+enum SystemLogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+enum BrokerConnectionStatus {
+  SUCCESS
+  FAILED
+}
+
+enum BrokerAction {
+  ACCOUNT_INFO
+  SYMBOLS
+  PRICE
+  DRY_RUN_ORDER
+  PLACE_ORDER
+}
+
+enum BrokerOrderSimulationStatus {
+  VALIDATED
+  BLOCKED
+  FAILED
+}
+
+enum EconomicImpact {
+  LOW
+  MEDIUM
+  HIGH
 }
 
 model User {
@@ -157,6 +209,7 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   refreshTokens AuthRefreshToken[]
+  manualTradingDecisions ManualTradingDecision[]
 }
 
 model AuthRefreshToken {
@@ -257,6 +310,8 @@ model TradingSignal {
   paperTrades     PaperTrade[]
   riskAssessments RiskAssessment[]
   supervisorDecision SupervisorDecision?
+  brokerOrderSimulations BrokerOrderSimulation[]
+  manualTradingDecisions ManualTradingDecision[]
 
   @@unique([instrumentId, timeframe, candleTimestamp])
   @@index([instrumentId, status, createdAt])
@@ -315,9 +370,37 @@ model RiskProfile {
   minRiskRewardRatio Decimal          @db.Decimal(12, 8)
   isActive           Boolean          @default(true)
   createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
   assessments        RiskAssessment[]
 
   @@index([isActive, createdAt])
+}
+
+model SystemLog {
+  id        String         @id @default(uuid())
+  level     SystemLogLevel
+  source    String
+  message   String
+  context   String?
+  createdAt DateTime       @default(now())
+
+  @@index([level, createdAt])
+  @@index([source, createdAt])
+}
+
+model EconomicEvent {
+  id        String         @id @default(uuid())
+  currency  String
+  title     String
+  impact    EconomicImpact
+  eventTime DateTime
+  source    String
+  notes     String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([currency, impact, eventTime])
+  @@index([eventTime])
 }
 
 model RiskAssessment {
@@ -347,8 +430,70 @@ model SupervisorDecision {
   metadata        Json?
   createdAt       DateTime                 @default(now())
   signal          TradingSignal            @relation(fields: [signalId], references: [id])
+  brokerOrderSimulations BrokerOrderSimulation[]
+  manualTradingDecisions ManualTradingDecision[]
 
   @@index([decision, createdAt])
+}
+
+model ManualTradingDecision {
+  id                   String                      @id @default(uuid())
+  signalId             String
+  supervisorDecisionId String
+  userId               String
+  decision             ManualTradingDecisionAction
+  executionTarget      ManualExecutionTarget       @default(NONE)
+  reason               String
+  metadata             Json?
+  ipAddress            String?
+  userAgent            String?
+  createdAt            DateTime                    @default(now())
+  signal               TradingSignal               @relation(fields: [signalId], references: [id])
+  supervisorDecision   SupervisorDecision           @relation(fields: [supervisorDecisionId], references: [id])
+  user                 User                         @relation(fields: [userId], references: [id])
+
+  @@index([signalId, createdAt])
+  @@index([userId, createdAt])
+  @@index([decision, executionTarget, createdAt])
+}
+
+model BrokerConnectionLog {
+  id              String                 @id @default(uuid())
+  provider        String
+  status          BrokerConnectionStatus
+  action          BrokerAction
+  requestPayload  Json?
+  responsePayload Json?
+  errorMessage    String?
+  createdAt       DateTime               @default(now())
+
+  @@index([provider, action, createdAt])
+  @@index([status, createdAt])
+}
+
+model BrokerOrderSimulation {
+  id                   String                      @id @default(uuid())
+  signalId             String?
+  supervisorDecisionId String?
+  provider             String
+  symbol               String
+  direction            TradeDirection
+  volume               Decimal                     @db.Decimal(24, 8)
+  entryPrice           Decimal                     @db.Decimal(20, 8)
+  stopLoss             Decimal?                    @db.Decimal(20, 8)
+  takeProfit           Decimal?                    @db.Decimal(20, 8)
+  status               BrokerOrderSimulationStatus
+  dryRun               Boolean                     @default(true)
+  reason               String
+  requestPayload       Json
+  responsePayload      Json
+  createdAt            DateTime                    @default(now())
+  signal               TradingSignal?              @relation(fields: [signalId], references: [id])
+  supervisorDecision   SupervisorDecision?          @relation(fields: [supervisorDecisionId], references: [id])
+
+  @@index([signalId, createdAt])
+  @@index([provider, symbol, createdAt])
+  @@index([status, createdAt])
 }
 
 model SystemConfig {

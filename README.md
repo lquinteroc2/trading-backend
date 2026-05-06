@@ -640,6 +640,216 @@ Para probar el flujo completo:
 3. Consultar `GET /agents/supervisor/decisions` y confirmar `OPERATE`, `WAIT` o `BLOCK`.
 4. Si fue `OPERATE`, consultar `GET /paper-trading/trades?signalId=SIGNAL_ID`.
 
+### Sprint 13: MT5 Broker Connector seguro
+
+Sprint 13 agrega una integracion segura con MetaTrader 5 sin reemplazar paper trading y sin ejecutar
+ordenes reales. El backend habla con un worker FastAPI en `services/mt5-worker`, persiste auditoria en
+`BrokerConnectionLog` y registra simulaciones en `BrokerOrderSimulation`.
+
+Variables principales:
+
+```env
+ENABLE_LIVE_TRADING=false
+BROKER_PROVIDER=MT5
+MT5_WORKER_BASE_URL=http://localhost:8010
+MT5_LOGIN=
+MT5_PASSWORD=
+MT5_SERVER=
+MT5_TERMINAL_PATH=
+MT5_DRY_RUN=true
+MT5_REQUEST_TIMEOUT_MS=10000
+```
+
+Ejecutar el worker local:
+
+```bash
+cd services/mt5-worker
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8010
+```
+
+Para una conexion real con terminal MT5 en un entorno compatible:
+
+```bash
+pip install MetaTrader5
+```
+
+Tambien existe el servicio `mt5-worker` en `docker-compose.yml`:
+
+```bash
+docker compose up mt5-worker
+```
+
+Limitacion importante: el paquete `MetaTrader5` requiere un terminal MT5 instalado y accesible por el
+runtime. En macOS/Linux Docker normalmente no hay wheel compatible del paquete oficial, asi que el
+contenedor queda para health, validacion de contratos y dry-run. Para cuenta/simbolos/precios reales,
+usa Windows/VPS o un entorno donde `pip install MetaTrader5` funcione y el terminal MT5 este disponible.
+
+Para cuenta demo: crear o abrir una cuenta demo desde el terminal MT5, confirmar que el terminal
+queda autenticado, y exportar `MT5_LOGIN`, `MT5_PASSWORD`, `MT5_SERVER` y, si aplica,
+`MT5_TERMINAL_PATH`. El backend nunca persiste ni retorna `MT5_PASSWORD`.
+
+Pruebas directas contra el worker:
+
+```bash
+curl http://localhost:8010/health
+curl http://localhost:8010/mt5/account
+curl http://localhost:8010/mt5/symbols
+curl http://localhost:8010/mt5/prices/XAUUSD
+curl -X POST http://localhost:8010/mt5/orders/dry-run \
+  -H "Content-Type: application/json" \
+  -d '{"symbol":"XAUUSD","direction":"BUY","volume":0.01,"entryPrice":2320.35,"stopLoss":2315,"takeProfit":2330}'
+```
+
+Endpoints del backend:
+
+```bash
+curl http://localhost:3000/api/v1/broker/mt5/health
+curl http://localhost:3000/api/v1/broker/mt5/account
+curl http://localhost:3000/api/v1/broker/mt5/symbols
+curl http://localhost:3000/api/v1/broker/mt5/prices/XAUUSD
+
+curl -X POST http://localhost:3000/api/v1/broker/mt5/orders/dry-run \
+  -H "Content-Type: application/json" \
+  -d '{"symbol":"XAUUSD","direction":"BUY","volume":0.01,"entryPrice":2320.35,"stopLoss":2315,"takeProfit":2330}'
+
+curl -X POST http://localhost:3000/api/v1/broker/mt5/orders/dry-run/from-signal \
+  -H "Content-Type: application/json" \
+  -d '{"signalId":"SIGNAL_ID"}'
+```
+
+`dry-run/from-signal` exige:
+
+- `RiskAssessment.decision = APPROVED`.
+- `SupervisorDecision.decision = OPERATE`.
+- Senal `BUY` o `SELL` con `entryPrice`, `stopLoss` y `takeProfit`.
+
+Verificar logs:
+
+```bash
+npx prisma studio
+```
+
+Revisar las tablas `BrokerConnectionLog` y `BrokerOrderSimulation`.
+
+`POST /broker/mt5/orders/place` existe y esta protegido para `ADMIN`, pero Sprint 13 lo bloquea por
+defecto. Si `ENABLE_LIVE_TRADING=false`, `MT5_DRY_RUN=true`, `killSwitch=true` o el modo del sistema no
+es compatible, retorna bloqueo controlado y deja log. Incluso con flags permisivos, el backend mantiene
+la ejecucion real deshabilitada en este sprint.
+
+Pendiente de produccion MT5: ver [docs/mt5-production-pending.md](docs/mt5-production-pending.md).
+
+### Sprint 14: Assisted Trading
+
+`ASSISTED_TRADING` agrega una compuerta manual entre el Supervisor y la ejecucion. El sistema sigue
+generando senales, Risk Agent evalua y Supervisor decide, pero cuando el modo global es
+`ASSISTED_TRADING` una decision `OPERATE` deja la senal en `PENDING_MANUAL_APPROVAL` y no abre trades
+automaticamente.
+
+Diferencia principal:
+
+- `PAPER_TRADING`: `SupervisorDecision.OPERATE` encola `paper-trade.open` automaticamente.
+- `ASSISTED_TRADING`: `SupervisorDecision.OPERATE` exige aprobacion manual.
+- `SAFE_MODE` / `PAUSED`: bloquean ejecucion.
+- `killSwitch=true`: bloquea toda aprobacion.
+
+Estados nuevos de senal:
+
+```text
+PENDING_MANUAL_APPROVAL
+MANUALLY_APPROVED
+MANUALLY_REJECTED
+EXECUTED_PAPER
+DRY_RUN_EXECUTED
+```
+
+Cambiar modo del sistema:
+
+```bash
+curl -X PATCH http://localhost:3000/api/v1/system/config \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{"mode":"ASSISTED_TRADING","killSwitch":false}'
+```
+
+Consultar senales pendientes:
+
+```bash
+curl http://localhost:3000/api/v1/assisted-trading/pending-signals \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Aprobar hacia Paper Trading:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/assisted-trading/signals/SIGNAL_ID/approve \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{"executionTarget":"PAPER_TRADING","reason":"Setup validado manualmente"}'
+```
+
+Aprobar hacia MT5 dry-run:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/assisted-trading/signals/SIGNAL_ID/approve \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{"executionTarget":"MT5_DRY_RUN","reason":"Validacion dry-run MT5"}'
+```
+
+Aprobar sin ejecutar:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/assisted-trading/signals/SIGNAL_ID/approve \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{"executionTarget":"NONE","reason":"Aprobada solo para seguimiento"}'
+```
+
+Rechazar:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/assisted-trading/signals/SIGNAL_ID/reject \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{"reason":"No me gusta el contexto del mercado"}'
+```
+
+Auditoria:
+
+```bash
+curl http://localhost:3000/api/v1/assisted-trading/decisions \
+  -H "Authorization: Bearer TOKEN"
+
+curl http://localhost:3000/api/v1/assisted-trading/decisions/MANUAL_DECISION_ID \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Cada decision manual queda en `ManualTradingDecision` con `userId`, `signalId`, decision, target,
+motivo, metadata, IP y user agent cuando el request los trae. Los eventos realtime emitidos son:
+
+```text
+assisted.approval_required
+assisted.signal_approved
+assisted.signal_rejected
+assisted.execution_started
+assisted.execution_completed
+assisted.execution_failed
+```
+
+Reglas de seguridad:
+
+- Solo `ADMIN` o `TRADER` pueden aprobar/rechazar.
+- Aprobar exige `SignalStatus.PENDING_MANUAL_APPROVAL`.
+- Aprobar exige `RiskAssessment.APPROVED`.
+- Aprobar exige `SupervisorDecision.OPERATE`.
+- Aprobar exige `SystemMode.ASSISTED_TRADING`.
+- `killSwitch=true` bloquea aprobacion.
+- No se permite doble aprobacion/rechazo.
+- MT5 sigue limitado a dry-run; no hay live trading real.
+
 ## Estructura
 
 ```text
@@ -663,6 +873,10 @@ src/
     supervisor/
     system/
     paper-trading/
+    broker/
+    assisted-trading/
+services/
+  mt5-worker/
 ```
 
 Cada modulo de negocio separa:

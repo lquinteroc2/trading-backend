@@ -1,7 +1,9 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { AgentExecutionSource } from '@prisma/client';
 import { Job, UnrecoverableError } from 'bullmq';
+import { InternalEventBus } from '@/events/internal-event-bus.service';
+import { TRADING_EVENTS } from '@/events/trading-events';
 import { QUEUE_JOBS, QUEUE_NAMES } from '@/queues/queue.constants';
 import { RiskEvaluationJobPayload } from '@/queues/risk-evaluation-queue.types';
 import { RiskAgentService } from '../application/risk-agent.service';
@@ -15,7 +17,11 @@ const riskEvaluationConcurrency = parseInt(
 export class RiskEvaluationProcessor extends WorkerHost {
   private readonly logger = new Logger(RiskEvaluationProcessor.name);
 
-  constructor(private readonly riskAgent: RiskAgentService) {
+  constructor(
+    private readonly riskAgent: RiskAgentService,
+    @Optional()
+    private readonly eventBus?: InternalEventBus,
+  ) {
     super();
   }
 
@@ -52,6 +58,16 @@ export class RiskEvaluationProcessor extends WorkerHost {
           durationMs: Date.now() - startedAt,
         }),
       );
+      this.eventBus?.emit(TRADING_EVENTS.JOB_COMPLETED, {
+        source: 'risk-evaluation',
+        jobId: String(job.id ?? ''),
+        message: 'Risk evaluation job completed',
+        payload: {
+          signalId: job.data.signalId,
+          assessmentId: result.assessment.id,
+          decision: result.assessment.decision,
+        },
+      });
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -69,6 +85,11 @@ export class RiskEvaluationProcessor extends WorkerHost {
           error: message,
         }),
       );
+      this.eventBus?.emit(TRADING_EVENTS.JOB_FAILED, {
+        source: 'risk-evaluation',
+        jobId: String(job.id ?? ''),
+        message,
+      });
       if (!retryable) {
         throw new UnrecoverableError(message);
       }

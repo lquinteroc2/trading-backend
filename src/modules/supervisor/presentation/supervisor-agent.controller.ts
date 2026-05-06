@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { SupervisorDecisionAction } from '@prisma/client';
+import { SupervisorDecisionAction, SystemMode } from '@prisma/client';
 import { PaperTradingQueueProducer } from '@/queues/paper-trading-queue.producer';
 import { SupervisorDecisionQueueProducer } from '@/queues/supervisor-decision-queue.producer';
 import { SupervisorAgentService } from '../application/supervisor-agent.service';
@@ -18,7 +18,10 @@ export class SupervisorAgentController {
   @Post('decide')
   async decide(@Body() dto: SupervisorDecideDto) {
     const result = await this.supervisorAgent.decideSignalById(dto.signalId);
-    if (result.supervisorDecision.decision === SupervisorDecisionAction.OPERATE) {
+    if (
+      result.supervisorDecision.decision === SupervisorDecisionAction.OPERATE &&
+      result.systemMode === SystemMode.PAPER_TRADING
+    ) {
       await this.paperTradingQueueProducer.enqueueOpenTrade({ signalId: dto.signalId });
     }
     return result;

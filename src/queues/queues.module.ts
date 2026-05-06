@@ -10,6 +10,7 @@ import { SignalGenerationQueueProducer } from './signal-generation-queue.produce
 import { TechnicalAnalysisQueueProducer } from './technical-analysis-queue.producer';
 import { PaperTradingQueueProducer } from './paper-trading-queue.producer';
 import { SupervisorDecisionQueueProducer } from './supervisor-decision-queue.producer';
+import { BrokerExecutionQueueProducer } from './broker-execution-queue.producer';
 
 const queueRegistrations = Object.values(QUEUE_NAMES).map((name) =>
   BullModule.registerQueue({ name }),
@@ -39,6 +40,7 @@ const queueRegistrations = Object.values(QUEUE_NAMES).map((name) =>
     PaperTradingQueueProducer,
     TechnicalAnalysisQueueProducer,
     SignalGenerationQueueProducer,
+    BrokerExecutionQueueProducer,
   ],
   exports: [
     BullModule,
@@ -47,6 +49,7 @@ const queueRegistrations = Object.values(QUEUE_NAMES).map((name) =>
     RiskEvaluationQueueProducer,
     SupervisorDecisionQueueProducer,
     PaperTradingQueueProducer,
+    BrokerExecutionQueueProducer,
   ],
 })
 export class QueuesModule {}

@@ -69,4 +69,13 @@ export default () => ({
     maxDailyDrawdown: parseFloat(process.env.SUPERVISOR_MAX_DRAWDOWN ?? '0.02'),
     queueConcurrency: parseInt(process.env.SUPERVISOR_DECISION_QUEUE_CONCURRENCY ?? '5', 10),
   },
+  broker: {
+    enableLiveTrading: (process.env.ENABLE_LIVE_TRADING ?? 'false').toLowerCase() === 'true',
+    provider: process.env.BROKER_PROVIDER ?? 'MT5',
+  },
+  mt5: {
+    workerBaseUrl: process.env.MT5_WORKER_BASE_URL ?? 'http://localhost:8010',
+    dryRun: (process.env.MT5_DRY_RUN ?? 'true').toLowerCase() === 'true',
+    requestTimeoutMs: parseInt(process.env.MT5_REQUEST_TIMEOUT_MS ?? '10000', 10),
+  },
 });

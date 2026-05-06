@@ -1,7 +1,9 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { AgentExecutionSource } from '@prisma/client';
 import { Job, UnrecoverableError } from 'bullmq';
+import { InternalEventBus } from '@/events/internal-event-bus.service';
+import { TRADING_EVENTS } from '@/events/trading-events';
 import { QUEUE_JOBS, QUEUE_NAMES } from '@/queues/queue.constants';
 import { TechnicalAnalysisJobPayload } from '@/queues/technical-analysis-queue.types';
 import { TechnicalAnalyzeUseCase } from '../application/technical-analyze.use-case';
@@ -15,7 +17,11 @@ const technicalAnalysisConcurrency = parseInt(
 export class TechnicalAnalysisProcessor extends WorkerHost {
   private readonly logger = new Logger(TechnicalAnalysisProcessor.name);
 
-  constructor(private readonly technicalAnalyze: TechnicalAnalyzeUseCase) {
+  constructor(
+    private readonly technicalAnalyze: TechnicalAnalyzeUseCase,
+    @Optional()
+    private readonly eventBus?: InternalEventBus,
+  ) {
     super();
   }
 
@@ -58,6 +64,18 @@ export class TechnicalAnalysisProcessor extends WorkerHost {
         }),
       );
 
+      this.eventBus?.emit(TRADING_EVENTS.JOB_COMPLETED, {
+        source: 'technical-analysis',
+        jobId: String(job.id ?? ''),
+        message: 'Technical analysis job completed',
+        payload: {
+          symbol: job.data.symbol,
+          timeframe: job.data.timeframe,
+          decision: result.decision,
+          confidenceScore: result.confidenceScore,
+        },
+      });
+
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -76,6 +94,11 @@ export class TechnicalAnalysisProcessor extends WorkerHost {
           error: message,
         }),
       );
+      this.eventBus?.emit(TRADING_EVENTS.JOB_FAILED, {
+        source: 'technical-analysis',
+        jobId: String(job.id ?? ''),
+        message,
+      });
 
       if (!retryable) {
         throw new UnrecoverableError(message);

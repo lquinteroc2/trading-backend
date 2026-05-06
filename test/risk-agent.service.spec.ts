@@ -44,6 +44,7 @@ describe('RiskAgentService', () => {
     minRiskRewardRatio: 2,
     isActive: true,
     createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
   const accountState: AccountState = {
@@ -65,6 +66,7 @@ describe('RiskAgentService', () => {
       findActive: jest.fn().mockResolvedValue(profile),
       findById: jest.fn(),
       upsertDefault: jest.fn(),
+      updateActive: jest.fn(),
     } as jest.Mocked<RiskProfilesRepository>;
     const riskAssessmentsRepository = {
       create: jest.fn().mockImplementation((data) =>

@@ -183,6 +183,43 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   SUPERVISOR_DECISION_QUEUE_CONCURRENCY?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  ENABLE_LIVE_TRADING?: boolean;
+
+  @IsOptional()
+  @IsString()
+  BROKER_PROVIDER?: string;
+
+  @IsOptional()
+  @IsString()
+  MT5_WORKER_BASE_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  MT5_LOGIN?: string;
+
+  @IsOptional()
+  @IsString()
+  MT5_PASSWORD?: string;
+
+  @IsOptional()
+  @IsString()
+  MT5_SERVER?: string;
+
+  @IsOptional()
+  @IsString()
+  MT5_TERMINAL_PATH?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  MT5_DRY_RUN?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  MT5_REQUEST_TIMEOUT_MS?: number;
 }
 
 export function validateConfig(config: Record<string, unknown>) {
