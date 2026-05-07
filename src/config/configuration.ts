@@ -48,12 +48,26 @@ export default () => ({
     timeoutMs: parseInt(process.env.TECHNICAL_ANALYSIS_TIMEOUT_MS ?? '8000', 10),
     queueConcurrency: parseInt(process.env.TECHNICAL_ANALYSIS_QUEUE_CONCURRENCY ?? '5', 10),
     queueDebounceMs: parseInt(process.env.TECHNICAL_ANALYSIS_QUEUE_DEBOUNCE_MS ?? '30000', 10),
+    supportResistanceLookback: parseInt(process.env.TECHNICAL_SR_LOOKBACK ?? '100', 10),
+    supportResistanceTolerancePercent: parseFloat(
+      process.env.TECHNICAL_SR_TOLERANCE_PERCENT ?? '0.002',
+    ),
+    lowVolAtrPercent: parseFloat(process.env.TECHNICAL_LOW_VOL_ATR_PERCENT ?? '0.003'),
+    highVolAtrPercent: parseFloat(process.env.TECHNICAL_HIGH_VOL_ATR_PERCENT ?? '0.03'),
+    enableMultiTimeframe:
+      (process.env.TECHNICAL_ENABLE_MULTI_TIMEFRAME ?? 'true').toLowerCase() === 'true',
+    confirmationTimeframes: (process.env.TECHNICAL_CONFIRMATION_TIMEFRAMES ?? 'H1,H4')
+      .split(',')
+      .map((timeframe) => timeframe.trim())
+      .filter(Boolean),
   },
   signals: {
     minConfidence: parseInt(process.env.SIGNAL_MIN_CONFIDENCE ?? '50', 10),
     atrStopLossMultiplier: parseFloat(process.env.SIGNAL_ATR_SL_MULTIPLIER ?? '1.5'),
     atrTakeProfitMultiplier: parseFloat(process.env.SIGNAL_ATR_TP_MULTIPLIER ?? '3'),
     queueConcurrency: parseInt(process.env.SIGNAL_GENERATION_QUEUE_CONCURRENCY ?? '5', 10),
+    blockRangingMarket: (process.env.SIGNAL_BLOCK_RANGING_MARKET ?? 'true').toLowerCase() === 'true',
+    blockMtfConflict: (process.env.SIGNAL_BLOCK_MTF_CONFLICT ?? 'true').toLowerCase() === 'true',
   },
   paperTrading: {
     enabled: (process.env.PAPER_TRADING_ENABLED ?? 'true').toLowerCase() === 'true',

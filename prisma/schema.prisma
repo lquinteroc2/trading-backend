@@ -51,6 +51,7 @@ enum SignalStatus {
   MANUALLY_REJECTED
   EXECUTED_PAPER
   DRY_RUN_EXECUTED
+  LIVE_EXECUTED
 }
 
 enum StrategyStatus {
@@ -146,6 +147,7 @@ enum SystemMode {
   BACKTESTING
   PAPER_TRADING
   ASSISTED_TRADING
+  LIVE_LIMITED
   SAFE_MODE
   PAUSED
 }
@@ -194,6 +196,40 @@ enum BrokerOrderSimulationStatus {
   FAILED
 }
 
+enum LiveTradeStatus {
+  REQUESTED
+  EXECUTED
+  REJECTED
+  FAILED
+  CLOSED
+}
+
+enum LiveExecutionAction {
+  VALIDATION
+  PLACE_ORDER
+  BROKER_RESPONSE
+  BLOCKED
+  FAILED
+}
+
+enum LiveExecutionStatus {
+  SUCCESS
+  FAILED
+  BLOCKED
+}
+
+enum AnalyticsExecutionType {
+  BACKTEST
+  PAPER_TRADING
+  LIVE_LIMITED
+}
+
+enum AnalyticsPeriodType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
 enum EconomicImpact {
   LOW
   MEDIUM
@@ -210,6 +246,7 @@ model User {
   updatedAt    DateTime @updatedAt
   refreshTokens AuthRefreshToken[]
   manualTradingDecisions ManualTradingDecision[]
+  liveExecutionLogs LiveExecutionLog[]
 }
 
 model AuthRefreshToken {
@@ -312,6 +349,8 @@ model TradingSignal {
   supervisorDecision SupervisorDecision?
   brokerOrderSimulations BrokerOrderSimulation[]
   manualTradingDecisions ManualTradingDecision[]
+  liveTrades LiveTrade[]
+  liveExecutionLogs LiveExecutionLog[]
 
   @@unique([instrumentId, timeframe, candleTimestamp])
   @@index([instrumentId, status, createdAt])
@@ -451,10 +490,79 @@ model ManualTradingDecision {
   signal               TradingSignal               @relation(fields: [signalId], references: [id])
   supervisorDecision   SupervisorDecision           @relation(fields: [supervisorDecisionId], references: [id])
   user                 User                         @relation(fields: [userId], references: [id])
+  liveTrades           LiveTrade[]
 
   @@index([signalId, createdAt])
   @@index([userId, createdAt])
   @@index([decision, executionTarget, createdAt])
+}
+
+model LiveTrade {
+  id               String          @id @default(uuid())
+  signalId         String
+  manualDecisionId String
+  brokerProvider   String
+  brokerOrderId    String?
+  symbol           String
+  direction        TradeDirection
+  volume           Decimal         @db.Decimal(24, 8)
+  entryPrice       Decimal         @db.Decimal(20, 8)
+  stopLoss         Decimal?        @db.Decimal(20, 8)
+  takeProfit       Decimal?        @db.Decimal(20, 8)
+  status           LiveTradeStatus
+  requestPayload   Json
+  responsePayload  Json?
+  errorMessage     String?
+  openedAt         DateTime?
+  closedAt         DateTime?
+  createdAt        DateTime        @default(now())
+  signal           TradingSignal   @relation(fields: [signalId], references: [id])
+  manualDecision   ManualTradingDecision @relation(fields: [manualDecisionId], references: [id])
+
+  @@index([signalId, createdAt])
+  @@index([symbol, status, createdAt])
+  @@index([manualDecisionId])
+}
+
+model LiveExecutionLog {
+  id        String              @id @default(uuid())
+  signalId  String?
+  userId    String?
+  action    LiveExecutionAction
+  status    LiveExecutionStatus
+  reason    String
+  payload   Json?
+  createdAt DateTime            @default(now())
+  signal    TradingSignal?      @relation(fields: [signalId], references: [id])
+  user      User?               @relation(fields: [userId], references: [id])
+
+  @@index([signalId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action, status, createdAt])
+}
+
+model LiveTradingLimits {
+  id                 String   @id
+  maxDailyLiveTrades Int      @default(1)
+  maxDailyLoss       Decimal  @default(50) @db.Decimal(24, 8)
+  maxVolumePerTrade  Decimal  @default(0.01) @db.Decimal(24, 8)
+  allowedSymbols     Json
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model AnalyticsReportSnapshot {
+  id            String                 @id @default(uuid())
+  executionType AnalyticsExecutionType
+  periodType    AnalyticsPeriodType
+  periodStart   DateTime
+  periodEnd     DateTime
+  metrics       Json
+  createdAt     DateTime               @default(now())
+
+  @@index([executionType, periodType, periodStart])
+  @@index([createdAt])
 }
 
 model BrokerConnectionLog {
@@ -567,6 +675,10 @@ model BacktestRun {
   netPnL            Decimal          @default(0) @db.Decimal(24, 8)
   averageWin        Decimal?         @db.Decimal(24, 8)
   averageLoss       Decimal?         @db.Decimal(24, 8)
+  signalsBeforeFilters Int           @default(0)
+  signalsAfterFilters  Int           @default(0)
+  filteredSignals      Int           @default(0)
+  filterReasons        Json?
   status            BacktestStatus   @default(RUNNING)
   errorMessage      String?
   createdAt         DateTime         @default(now())

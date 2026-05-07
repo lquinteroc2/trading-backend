@@ -76,6 +76,29 @@ describe('TechnicalAnalyzeUseCase', () => {
         technicalBias: 'BULLISH',
         confidenceScore: 80,
         indicators: { ema20: 10, ema50: 9, ema200: 8, rsi14: 55, atr14: 1 },
+        supportResistance: {
+          supports: [{ price: 95, touches: 3, strength: 'STRONG' }],
+          resistances: [{ price: 120, touches: 2, strength: 'MEDIUM' }],
+          nearestSupport: 95,
+          nearestResistance: 120,
+        },
+        marketRegime: {
+          regime: 'TRENDING',
+          isRanging: false,
+          volatilityState: 'NORMAL',
+          atrPercent: 0.01,
+          reason: 'ok',
+        },
+        multiTimeframe: {
+          primary: Timeframe.M15,
+          confirmationTimeframes: [Timeframe.H1, Timeframe.H4],
+          alignment: 'ALIGNED',
+          biasByTimeframe: {
+            [Timeframe.M15]: 'BULLISH',
+            [Timeframe.H1]: 'BULLISH',
+            [Timeframe.H4]: 'BULLISH',
+          },
+        },
         reasoning: ['bullish alignment'],
         warnings: [],
       }),
@@ -87,6 +110,8 @@ describe('TechnicalAnalyzeUseCase', () => {
         const values: Record<string, unknown> = {
           'technicalAgent.minCandles': 200,
           'technicalAgent.defaultLimit': 1000,
+          'technicalAgent.enableMultiTimeframe': true,
+          'technicalAgent.confirmationTimeframes': [Timeframe.H1, Timeframe.H4],
         };
         return values[key];
       }),
@@ -121,7 +146,13 @@ describe('TechnicalAnalyzeUseCase', () => {
       expect.objectContaining({
         symbol: 'BTCUSDT',
         timeframe: Timeframe.M15,
+        primaryTimeframe: Timeframe.M15,
         candles: expect.arrayContaining([expect.objectContaining({ close: expect.any(Number) })]),
+        timeframes: expect.objectContaining({
+          [Timeframe.M15]: expect.any(Array),
+          [Timeframe.H1]: expect.any(Array),
+          [Timeframe.H4]: expect.any(Array),
+        }),
       }),
     );
     expect(decisions.create).toHaveBeenCalledWith(
@@ -133,6 +164,9 @@ describe('TechnicalAnalyzeUseCase', () => {
         confidenceScore: 80,
         metadata: expect.objectContaining({
           indicators: expect.objectContaining({ rsi14: 55 }),
+          supportResistance: expect.objectContaining({ nearestSupport: 95 }),
+          marketRegime: expect.objectContaining({ isRanging: false }),
+          multiTimeframe: expect.objectContaining({ alignment: 'ALIGNED' }),
         }),
       }),
     );
@@ -141,5 +175,34 @@ describe('TechnicalAnalyzeUseCase', () => {
       indicators: { ema20: 10, ema50: 9, ema200: 8, rsi14: 55, atr14: 1 },
       agentDecisionId: 'decision-id',
     });
+  });
+
+  it('sends requested multi-timeframe payload and saves extended metadata', async () => {
+    const { useCase, candles, decisions } = makeUseCase();
+
+    await useCase.execute({
+      instrumentId: instrument.id,
+      primaryTimeframe: Timeframe.M15,
+      confirmationTimeframes: [Timeframe.H1],
+      limit: 200,
+    });
+
+    expect(candles.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ timeframe: Timeframe.M15 }),
+    );
+    expect(candles.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ timeframe: Timeframe.H1 }),
+    );
+    expect(decisions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          primaryTimeframe: Timeframe.M15,
+          confirmationTimeframes: [Timeframe.H1],
+          supportResistance: expect.any(Object),
+          marketRegime: expect.any(Object),
+          multiTimeframe: expect.any(Object),
+        }),
+      }),
+    );
   });
 });

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 from app.config import Settings
@@ -65,10 +66,51 @@ class Mt5Client:
     def place_order(self, request: OrderRequest) -> Dict[str, Any]:
         if not self.settings.enable_live_trading or self.settings.mt5_dry_run:
             return {"blocked": True, "reason": "Live trading is disabled"}
+
+        self._ensure_connected()
+        self._mt5.symbol_select(request.symbol, True)
+        tick = self._mt5.symbol_info_tick(request.symbol)
+        if tick is None:
+            raise Mt5NotConnectedError(f"No tick available for {request.symbol}")
+
+        order_type = self._mt5.ORDER_TYPE_BUY if request.direction == "BUY" else self._mt5.ORDER_TYPE_SELL
+        requested_price = request.entryPrice
+        market_price = float(tick.ask if request.direction == "BUY" else tick.bid)
+        order_payload = {
+            "action": self._mt5.TRADE_ACTION_DEAL,
+            "symbol": request.symbol,
+            "volume": request.volume,
+            "type": order_type,
+            "price": market_price,
+            "sl": request.stopLoss,
+            "tp": request.takeProfit,
+            "deviation": 20,
+            "magic": 150015,
+            "comment": request.comment or "INVERSIONES_LIVE_LIMITED",
+            "type_time": self._mt5.ORDER_TIME_GTC,
+            "type_filling": self._mt5.ORDER_FILLING_IOC,
+        }
+        result = self._mt5.order_send(order_payload)
+        if result is None:
+            raise Mt5NotConnectedError("MT5 order_send returned no result")
+
+        retcode = getattr(result, "retcode", None)
+        if retcode != self._mt5.TRADE_RETCODE_DONE:
+            comment = getattr(result, "comment", "Broker rejected order")
+            raise Mt5NotConnectedError(f"Broker rejected order: {comment} ({retcode})")
+
+        executed_price = float(getattr(result, "price", market_price) or market_price)
+        broker_order_id = str(getattr(result, "order", "") or getattr(result, "deal", ""))
         return {
-            "blocked": True,
-            "reason": "Live trading is not implemented in Sprint 13",
-            "request": request.model_dump(),
+            "executed": True,
+            "brokerOrderId": broker_order_id,
+            "symbol": request.symbol,
+            "direction": request.direction,
+            "volume": request.volume,
+            "requestedPrice": requested_price,
+            "executedPrice": executed_price,
+            "spread": abs(executed_price - requested_price),
+            "timestamp": datetime.now(tz=timezone.utc).isoformat(),
         }
 
     def _ensure_connected(self) -> None:

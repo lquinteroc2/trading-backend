@@ -850,6 +850,325 @@ Reglas de seguridad:
 - No se permite doble aprobacion/rechazo.
 - MT5 sigue limitado a dry-run; no hay live trading real.
 
+### Sprint 15: LIVE_LIMITED
+
+`LIVE_LIMITED` habilita ejecucion real limitada en MT5, pero solo bajo compuerta manual y con multiples
+condiciones de seguridad. Por defecto todo sigue bloqueado.
+
+Advertencia operativa:
+
+```text
+No activar LIVE_LIMITED con dinero real hasta probar en demo, revisar logs y confirmar limites.
+No usar este modo para ejecucion automatica. Siempre requiere aprobacion manual y usuario ADMIN.
+```
+
+Condiciones obligatorias para ejecutar:
+
+- `ENABLE_LIVE_TRADING=true`.
+- `MT5_DRY_RUN=false`.
+- `SystemMode=LIVE_LIMITED`.
+- `killSwitch=false`.
+- Usuario `ADMIN`.
+- `RiskAssessment.APPROVED`.
+- `SupervisorDecision.OPERATE`.
+- `ManualTradingDecision.APPROVE`.
+- Texto exacto de confirmacion.
+- Simbolo permitido.
+- Volumen bajo `maxVolumePerTrade`.
+- Limite diario no alcanzado.
+- Sin trade real abierto del mismo simbolo.
+- Senal no ejecutada previamente en live.
+
+Variables:
+
+```env
+ENABLE_LIVE_TRADING=false
+MT5_DRY_RUN=true
+BROKER_PROVIDER=MT5
+MT5_WORKER_BASE_URL=http://WINDOWS_VPS_OR_LOCAL_WINDOWS:8010
+```
+
+Activar modo limitado requiere cambiar explicitamente las variables y el modo:
+
+```bash
+curl -X PATCH http://localhost:3000/api/v1/system/config \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -d '{"mode":"LIVE_LIMITED","killSwitch":false}'
+```
+
+Configurar limites:
+
+```bash
+curl -X PATCH http://localhost:3000/api/v1/live-trading/limits \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -d '{"maxDailyLiveTrades":1,"maxDailyLoss":50,"maxVolumePerTrade":0.01,"allowedSymbols":["XAUUSD","BTCUSDT"],"isActive":true}'
+```
+
+Consultar limites:
+
+```bash
+curl http://localhost:3000/api/v1/live-trading/limits \
+  -H "Authorization: Bearer ADMIN_TOKEN"
+```
+
+Ejecutar una orden real limitada:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/live-trading/signals/SIGNAL_ID/execute \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -d '{"manualDecisionId":"MANUAL_DECISION_ID","confirmationText":"CONFIRMO EJECUCION REAL LIMITADA"}'
+```
+
+Verificar auditoria:
+
+```bash
+curl http://localhost:3000/api/v1/live-trading/logs \
+  -H "Authorization: Bearer ADMIN_TOKEN"
+
+curl http://localhost:3000/api/v1/live-trading/trades \
+  -H "Authorization: Bearer ADMIN_TOKEN"
+```
+
+Apagar con kill switch:
+
+```bash
+curl -X PATCH http://localhost:3000/api/v1/system/config \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -d '{"killSwitch":true}'
+```
+
+Volver a modo seguro:
+
+```bash
+curl -X PATCH http://localhost:3000/api/v1/system/config \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -d '{"mode":"SAFE_MODE","killSwitch":true}'
+```
+
+Eventos realtime:
+
+```text
+live.execution_requested
+live.execution_blocked
+live.execution_success
+live.execution_failed
+live.trade_opened
+```
+
+### Sprint 16: Analytics y reportes
+
+`AnalyticsModule` agrega métricas avanzadas de rendimiento sin modificar ningún flujo de ejecución. Lee
+trades de backtesting, paper trading y live limited, normaliza los datos y calcula métricas comunes.
+
+Fuentes soportadas:
+
+- `BACKTEST`: `BacktestTrade`.
+- `PAPER_TRADING`: `PaperTrade` cerrado.
+- `LIVE_LIMITED`: `LiveTrade` si tiene PnL disponible en `responsePayload` o datos de cierre.
+
+Métricas:
+
+- `winRate = winningTrades / totalTrades`
+- `lossRate = losingTrades / totalTrades`
+- `profitFactor = grossProfit / abs(grossLoss)`
+- `netPnL = suma(pnl)`
+- `averageWin = promedio(pnl > 0)`
+- `averageLoss = promedio(pnl < 0)`
+- `expectancy = (winRate * averageWin) - (lossRate * abs(averageLoss))`
+- `maxDrawdown = máxima caída desde pico de equity acumulada`
+- `averageRiskReward`, `bestTrade`, `worstTrade`
+
+Endpoints:
+
+```bash
+curl "http://localhost:3000/api/v1/analytics/summary?executionType=PAPER_TRADING&from=2026-01-01&to=2026-01-31" \
+  -H "Authorization: Bearer TOKEN"
+
+curl "http://localhost:3000/api/v1/analytics/daily?executionType=PAPER_TRADING" \
+  -H "Authorization: Bearer TOKEN"
+
+curl "http://localhost:3000/api/v1/analytics/weekly?executionType=BACKTEST" \
+  -H "Authorization: Bearer TOKEN"
+
+curl "http://localhost:3000/api/v1/analytics/by-strategy?executionType=BACKTEST" \
+  -H "Authorization: Bearer TOKEN"
+
+curl "http://localhost:3000/api/v1/analytics/by-symbol?executionType=PAPER_TRADING" \
+  -H "Authorization: Bearer TOKEN"
+
+curl "http://localhost:3000/api/v1/analytics/by-timeframe?executionType=BACKTEST" \
+  -H "Authorization: Bearer TOKEN"
+
+curl "http://localhost:3000/api/v1/analytics/equity-curve?executionType=PAPER_TRADING" \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Filtros disponibles:
+
+```text
+executionType=BACKTEST | PAPER_TRADING | LIVE_LIMITED
+instrumentId=...
+symbol=...
+strategyId=...
+timeframe=M1 | M5 | M15 | M30 | H1 | H4 | D1
+from=YYYY-MM-DD
+to=YYYY-MM-DD
+```
+
+Exportar CSV:
+
+```bash
+curl "http://localhost:3000/api/v1/analytics/export.csv?type=trades&executionType=PAPER_TRADING" \
+  -H "Authorization: Bearer ADMIN_OR_TRADER_TOKEN"
+
+curl "http://localhost:3000/api/v1/analytics/export.csv?type=daily&executionType=PAPER_TRADING" \
+  -H "Authorization: Bearer ADMIN_OR_TRADER_TOKEN"
+
+curl "http://localhost:3000/api/v1/analytics/export.csv?type=weekly&executionType=BACKTEST" \
+  -H "Authorization: Bearer ADMIN_OR_TRADER_TOKEN"
+
+curl "http://localhost:3000/api/v1/analytics/export.csv?type=strategy&executionType=BACKTEST" \
+  -H "Authorization: Bearer ADMIN_OR_TRADER_TOKEN"
+
+curl "http://localhost:3000/api/v1/analytics/export.csv?type=symbol&executionType=PAPER_TRADING" \
+  -H "Authorization: Bearer ADMIN_OR_TRADER_TOKEN"
+```
+
+Seguridad:
+
+- Consultas: `ADMIN`, `TRADER`, `VIEWER`.
+- Exportación CSV: solo `ADMIN` o `TRADER`.
+
+Limitaciones actuales:
+
+- `LIVE_LIMITED` no inventa PnL: solo incluye métricas cuando exista PnL disponible.
+- Los snapshots `AnalyticsReportSnapshot` quedan modelados para auditoría futura, pero este sprint se
+  centra en cálculo y exposición de métricas bajo demanda.
+- No se modifica lógica de ejecución, estrategias ni live trading.
+
+### Sprint 17: Technical Agent avanzado
+
+El worker técnico ahora produce un análisis más robusto y determinístico para reducir señales falsas.
+No usa machine learning, no ejecuta operaciones y no cambia los flujos de Risk, Supervisor, Paper,
+Assisted ni Live Limited.
+
+Nuevas capacidades:
+
+- Soportes y resistencias por swing highs/lows agrupados por tolerancia porcentual.
+- Detección de régimen: `TRENDING`, `RANGING`, `HIGH_VOLATILITY`, `LOW_VOLATILITY`.
+- Filtro de volatilidad usando `ATR14 / close`.
+- Confirmación multi-timeframe con `ALIGNED`, `PARTIAL` o `CONFLICTED`.
+- `confidenceScore` con penalizaciones por rango, conflicto MTF y volatilidad extrema.
+- Metadata técnica extendida en `AgentDecision.metadata`.
+
+Variables:
+
+```env
+TECHNICAL_SR_LOOKBACK=100
+TECHNICAL_SR_TOLERANCE_PERCENT=0.002
+TECHNICAL_LOW_VOL_ATR_PERCENT=0.003
+TECHNICAL_HIGH_VOL_ATR_PERCENT=0.03
+TECHNICAL_ENABLE_MULTI_TIMEFRAME=true
+TECHNICAL_CONFIRMATION_TIMEFRAMES=H1,H4
+SIGNAL_BLOCK_RANGING_MARKET=true
+SIGNAL_BLOCK_MTF_CONFLICT=true
+```
+
+Probar worker directamente:
+
+```bash
+curl -X POST http://localhost:8000/technical-analysis/analyze \
+  -H "Content-Type: application/json" \
+  -d '{
+    "symbol":"BTCUSDT",
+    "primaryTimeframe":"M15",
+    "timeframes":{
+      "M15":[...],
+      "H1":[...],
+      "H4":[...]
+    }
+  }'
+```
+
+El request anterior sigue funcionando:
+
+```json
+{
+  "symbol": "BTCUSDT",
+  "timeframe": "M15",
+  "candles": []
+}
+```
+
+Probar desde backend:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/agents/technical/analyze \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{
+    "instrumentId":"INSTRUMENT_ID",
+    "primaryTimeframe":"M15",
+    "confirmationTimeframes":["H1","H4"],
+    "limit":1000
+  }'
+```
+
+La respuesta y `AgentDecision.metadata` incluyen:
+
+```text
+indicators
+supportResistance
+marketRegime
+multiTimeframe
+warnings
+rawResponse
+```
+
+Cambios en generación de señales:
+
+- No genera `BUY` si el mercado está en rango.
+- No genera `BUY` si MTF está `CONFLICTED`.
+- No genera `BUY` si el precio está demasiado cerca de la resistencia.
+- No genera `SELL` si el mercado está en rango.
+- No genera `SELL` si MTF está `CONFLICTED`.
+- No genera `SELL` si el precio está demasiado cerca del soporte.
+
+Backtesting con filtros:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/backtesting/run \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{
+    "instrumentId":"INSTRUMENT_ID",
+    "timeframe":"M15",
+    "startDate":"2024-01-01T00:00:00.000Z",
+    "endDate":"2024-03-01T00:00:00.000Z",
+    "initialBalance":10000,
+    "useSupportResistanceFilter":true,
+    "useMarketRegimeFilter":true,
+    "useMultiTimeframeConfirmation":true
+  }'
+```
+
+Métricas adicionales de comparación:
+
+```text
+signalsBeforeFilters
+signalsAfterFilters
+filteredSignals
+filterReasons
+```
+
+Estas métricas permiten comparar si los filtros reducen entradas en rango, conflictos MTF o entradas
+pegadas a niveles técnicos.
+
 ## Estructura
 
 ```text
@@ -875,7 +1194,10 @@ src/
     paper-trading/
     broker/
     assisted-trading/
+    live-trading/
+    analytics/
 services/
+  agents/
   mt5-worker/
 ```
 

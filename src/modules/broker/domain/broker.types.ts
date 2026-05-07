@@ -45,3 +45,15 @@ export type BrokerBlockedOrderResponse = {
   blocked: true;
   reason: string;
 };
+
+export type BrokerLiveOrderResponse = {
+  executed: boolean;
+  brokerOrderId: string;
+  symbol: string;
+  direction: 'BUY' | 'SELL';
+  volume: number;
+  requestedPrice: number;
+  executedPrice: number;
+  spread: number;
+  timestamp: string;
+};

@@ -72,6 +72,48 @@ describe('BacktestingEngineService', () => {
     expect(result.metrics.netPnL).toBe(-100);
     expect(result.metrics.maxDrawdown).toBe(0.01);
   });
+
+  it('reports filteredSignals when strategy blocks advanced technical filters', async () => {
+    const strategyEngine = {
+      evaluateStrategy: jest.fn().mockReturnValue({
+        strategyId: 'strategy-id',
+        strategyName: 'EMA_TREND_STRATEGY',
+        direction: SignalDirection.NONE,
+        entryPrice: 100,
+        confidence: 0,
+        reason: 'NO_SIGNAL: market regime is ranging',
+        shouldCreateSignal: false,
+      }),
+    } as unknown as StrategyEngineService;
+    const service = new BacktestingEngineService(
+      strategyEngine,
+      new BacktestingIndicatorsService(),
+      new BacktestingMetricsService(),
+    );
+
+    const result = await service.run({
+      backtestRunId: 'run-id',
+      strategy,
+      instrumentId: 'instrument-id',
+      symbol: 'BTCUSDT',
+      timeframe: Timeframe.M15,
+      initialBalance: 10000,
+      riskPercent: 0.01,
+      useMarketRegimeFilter: true,
+      candles: [
+        candle('1', 100, 101, 99, 100, 0),
+        candle('2', 100, 101, 99, 100, 1),
+        candle('3', 100, 101, 99, 100, 2),
+      ],
+    });
+
+    expect(result.metrics).toMatchObject({
+      signalsBeforeFilters: 3,
+      signalsAfterFilters: 0,
+      filteredSignals: 3,
+      filterReasons: { 'NO_SIGNAL: market regime is ranging': 3 },
+    });
+  });
 });
 
 function candle(id: string, open: number, high: number, low: number, close: number, index: number) {

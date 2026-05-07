@@ -23,3 +23,15 @@ class DryRunOrderResponse(BaseModel):
 class BlockedOrderResponse(BaseModel):
     blocked: bool
     reason: str
+
+
+class LiveOrderResponse(BaseModel):
+    executed: bool
+    brokerOrderId: str
+    symbol: str
+    direction: str
+    volume: float
+    requestedPrice: float
+    executedPrice: float
+    spread: float
+    timestamp: str

@@ -20,6 +20,8 @@ import { EconomicEventsModule } from './modules/economic-events/economic-events.
 import { FundamentalModule } from './modules/fundamental/fundamental.module';
 import { BrokerModule } from './modules/broker/broker.module';
 import { AssistedTradingModule } from './modules/assisted-trading/assisted-trading.module';
+import { LiveTradingModule } from './modules/live-trading/live-trading.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { QueuesModule } from './queues/queues.module';
@@ -58,6 +60,8 @@ import { validateConfig } from './config/env.validation';
     PaperTradingModule,
     BrokerModule,
     AssistedTradingModule,
+    LiveTradingModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

@@ -131,6 +131,31 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsInt()
+  @Min(1)
+  TECHNICAL_SR_LOOKBACK?: number;
+
+  @IsOptional()
+  @Min(0)
+  TECHNICAL_SR_TOLERANCE_PERCENT?: number;
+
+  @IsOptional()
+  @Min(0)
+  TECHNICAL_LOW_VOL_ATR_PERCENT?: number;
+
+  @IsOptional()
+  @Min(0)
+  TECHNICAL_HIGH_VOL_ATR_PERCENT?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  TECHNICAL_ENABLE_MULTI_TIMEFRAME?: boolean;
+
+  @IsOptional()
+  @IsString()
+  TECHNICAL_CONFIRMATION_TIMEFRAMES?: string;
+
+  @IsOptional()
+  @IsInt()
   @Min(0)
   SIGNAL_MIN_CONFIDENCE?: number;
 
@@ -146,6 +171,14 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   SIGNAL_GENERATION_QUEUE_CONCURRENCY?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  SIGNAL_BLOCK_RANGING_MARKET?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  SIGNAL_BLOCK_MTF_CONFLICT?: boolean;
 
   @IsOptional()
   @Min(0)

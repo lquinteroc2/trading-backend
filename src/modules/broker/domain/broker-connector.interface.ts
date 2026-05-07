@@ -2,6 +2,7 @@ import {
   BrokerAccountInfo,
   BrokerBlockedOrderResponse,
   BrokerDryRunOrderResponse,
+  BrokerLiveOrderResponse,
   BrokerOrderRequest,
   BrokerPrice,
   BrokerSymbolInfo,
@@ -15,5 +16,5 @@ export interface IBrokerConnector {
   getSymbols(): Promise<{ symbols: BrokerSymbolInfo[] }>;
   getPrice(symbol: string): Promise<BrokerPrice>;
   dryRunOrder(orderRequest: BrokerOrderRequest): Promise<BrokerDryRunOrderResponse>;
-  placeOrder(orderRequest: BrokerOrderRequest): Promise<BrokerBlockedOrderResponse | unknown>;
+  placeOrder(orderRequest: BrokerOrderRequest): Promise<BrokerBlockedOrderResponse | BrokerLiveOrderResponse>;
 }

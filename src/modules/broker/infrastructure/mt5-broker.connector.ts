@@ -5,6 +5,7 @@ import {
   BrokerAccountInfo,
   BrokerBlockedOrderResponse,
   BrokerDryRunOrderResponse,
+  BrokerLiveOrderResponse,
   BrokerOrderRequest,
   BrokerPrice,
   BrokerSymbolInfo,
@@ -40,7 +41,7 @@ export class Mt5BrokerConnector implements IBrokerConnector {
     return this.request('POST', '/mt5/orders/dry-run', orderRequest);
   }
 
-  placeOrder(orderRequest: BrokerOrderRequest): Promise<BrokerBlockedOrderResponse | unknown> {
+  placeOrder(orderRequest: BrokerOrderRequest): Promise<BrokerBlockedOrderResponse | BrokerLiveOrderResponse> {
     return this.request('POST', '/mt5/orders/place', orderRequest);
   }
 

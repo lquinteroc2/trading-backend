@@ -20,7 +20,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/database/prisma.service';
 import { SystemConfigService } from '@/modules/system/application/system-config.service';
 import { BROKER_CONNECTOR, IBrokerConnector } from '../domain/broker-connector.interface';
-import { BrokerOrderRequest } from '../domain/broker.types';
+import { BrokerLiveOrderResponse, BrokerOrderRequest } from '../domain/broker.types';
 
 @Injectable()
 export class BrokerService {
@@ -105,6 +105,19 @@ export class BrokerService {
     throw new ForbiddenException(response);
   }
 
+  async placeLiveOrder(orderRequest: BrokerOrderRequest): Promise<BrokerLiveOrderResponse> {
+    const response = await this.logConnectorCall(BrokerAction.PLACE_ORDER, orderRequest, () =>
+      this.connector.placeOrder({
+        ...orderRequest,
+        comment: orderRequest.comment ?? 'INVERSIONES_LIVE_LIMITED',
+      }),
+    );
+    if ('blocked' in response && response.blocked) {
+      throw new ForbiddenException(response);
+    }
+    return response as BrokerLiveOrderResponse;
+  }
+
   async dryRunOrderFromSignal(signalId: string) {
     const signal = await this.prisma.tradingSignal.findUnique({
       where: { id: signalId },
@@ -163,7 +176,7 @@ export class BrokerService {
     if (systemConfig.killSwitch) {
       return 'Kill switch is enabled';
     }
-    if (systemConfig.mode !== SystemMode.SAFE_MODE) {
+    if (systemConfig.mode !== SystemMode.LIVE_LIMITED) {
       return 'System mode is not compatible with live broker execution';
     }
     return null;

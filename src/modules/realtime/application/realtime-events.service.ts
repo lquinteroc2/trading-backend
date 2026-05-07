@@ -20,6 +20,7 @@ import {
   AssistedApprovalRequiredEvent,
   AssistedExecutionEvent,
   AssistedSignalDecisionEvent,
+  LiveExecutionEvent,
 } from '@/events/trading-events';
 
 type RealtimeEventType =
@@ -43,6 +44,11 @@ type RealtimeEventType =
   | 'ASSISTED_EXECUTION_STARTED'
   | 'ASSISTED_EXECUTION_COMPLETED'
   | 'ASSISTED_EXECUTION_FAILED'
+  | 'LIVE_EXECUTION_REQUESTED'
+  | 'LIVE_EXECUTION_BLOCKED'
+  | 'LIVE_EXECUTION_SUCCESS'
+  | 'LIVE_EXECUTION_FAILED'
+  | 'LIVE_TRADE_OPENED'
   | 'HEARTBEAT';
 
 type RealtimeEvent = {
@@ -292,6 +298,54 @@ export class RealtimeEventsService {
                 executionTarget: event.executionTarget,
               }),
             ),
+        ),
+        this.eventBus.on<LiveExecutionEvent>(TRADING_EVENTS.LIVE_EXECUTION_REQUESTED, (event) =>
+          send(
+            this.buildEvent('LIVE_EXECUTION_REQUESTED', 'Ejecución real solicitada', event.reason, {
+              signalId: event.signalId,
+              userId: event.userId,
+              ...(event.payload ?? {}),
+            }),
+          ),
+        ),
+        this.eventBus.on<LiveExecutionEvent>(TRADING_EVENTS.LIVE_EXECUTION_BLOCKED, (event) =>
+          send(
+            this.buildEvent('LIVE_EXECUTION_BLOCKED', 'Ejecución real bloqueada', event.reason, {
+              signalId: event.signalId,
+              userId: event.userId,
+              ...(event.payload ?? {}),
+            }),
+          ),
+        ),
+        this.eventBus.on<LiveExecutionEvent>(TRADING_EVENTS.LIVE_EXECUTION_SUCCESS, (event) =>
+          send(
+            this.buildEvent('LIVE_EXECUTION_SUCCESS', 'Ejecución real completada', event.reason, {
+              signalId: event.signalId,
+              userId: event.userId,
+              liveTradeId: event.liveTradeId,
+              ...(event.payload ?? {}),
+            }),
+          ),
+        ),
+        this.eventBus.on<LiveExecutionEvent>(TRADING_EVENTS.LIVE_EXECUTION_FAILED, (event) =>
+          send(
+            this.buildEvent('LIVE_EXECUTION_FAILED', 'Ejecución real falló', event.reason, {
+              signalId: event.signalId,
+              userId: event.userId,
+              liveTradeId: event.liveTradeId,
+              ...(event.payload ?? {}),
+            }),
+          ),
+        ),
+        this.eventBus.on<LiveExecutionEvent>(TRADING_EVENTS.LIVE_TRADE_OPENED, (event) =>
+          send(
+            this.buildEvent('LIVE_TRADE_OPENED', 'Trade real abierto', event.reason, {
+              signalId: event.signalId,
+              userId: event.userId,
+              liveTradeId: event.liveTradeId,
+              ...(event.payload ?? {}),
+            }),
+          ),
         ),
       ];
 

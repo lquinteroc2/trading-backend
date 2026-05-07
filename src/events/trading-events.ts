@@ -27,6 +27,11 @@ export const TRADING_EVENTS = {
   ASSISTED_EXECUTION_STARTED: 'assisted.execution_started',
   ASSISTED_EXECUTION_COMPLETED: 'assisted.execution_completed',
   ASSISTED_EXECUTION_FAILED: 'assisted.execution_failed',
+  LIVE_EXECUTION_REQUESTED: 'live.execution_requested',
+  LIVE_EXECUTION_BLOCKED: 'live.execution_blocked',
+  LIVE_EXECUTION_SUCCESS: 'live.execution_success',
+  LIVE_EXECUTION_FAILED: 'live.execution_failed',
+  LIVE_TRADE_OPENED: 'live.trade_opened',
 } as const;
 
 export type CandleClosedEvent = {
@@ -162,4 +167,12 @@ export type AssistedExecutionEvent = {
   manualDecisionId: string;
   executionTarget: string;
   message: string;
+};
+
+export type LiveExecutionEvent = {
+  signalId: string;
+  userId: string;
+  liveTradeId?: string;
+  reason: string;
+  payload?: Record<string, unknown>;
 };

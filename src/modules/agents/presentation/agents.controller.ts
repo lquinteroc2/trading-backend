@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { TechnicalAnalysisQueueProducer } from '@/queues/technical-analysis-queue.producer';
 import { AgentsService } from '../application/agents.service';
@@ -25,8 +25,13 @@ export class AgentsController {
 
   @Post('technical/analyze/enqueue')
   async enqueueTechnicalAnalysis(@Body() dto: AnalyzeTechnicalDto) {
+    const timeframe = dto.primaryTimeframe ?? dto.timeframe;
+    if (!timeframe) {
+      throw new BadRequestException('timeframe or primaryTimeframe is required');
+    }
     return this.technicalAnalysisQueueProducer.enqueueTechnicalAnalysis({
       ...dto,
+      timeframe,
       executionSource: 'MANUAL',
       force: true,
     });
