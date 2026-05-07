@@ -1,6 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { Job, UnrecoverableError } from 'bullmq';
+import { InternalEventBus } from '@/events/internal-event-bus.service';
+import { TRADING_EVENTS } from '@/events/trading-events';
 import { QUEUE_JOBS, QUEUE_NAMES } from '@/queues/queue.constants';
 import { SignalGenerationJobPayload } from '@/queues/signal-generation-queue.types';
 import { SignalGenerationService } from '../application/signal-generation.service';
@@ -14,7 +16,11 @@ const signalGenerationConcurrency = parseInt(
 export class SignalGenerationProcessor extends WorkerHost {
   private readonly logger = new Logger(SignalGenerationProcessor.name);
 
-  constructor(private readonly signalGeneration: SignalGenerationService) {
+  constructor(
+    private readonly signalGeneration: SignalGenerationService,
+    @Optional()
+    private readonly eventBus?: InternalEventBus,
+  ) {
     super();
   }
 
@@ -52,6 +58,17 @@ export class SignalGenerationProcessor extends WorkerHost {
           durationMs: Date.now() - startedAt,
         }),
       );
+      this.eventBus?.emit(TRADING_EVENTS.JOB_COMPLETED, {
+        source: 'signal-generation',
+        jobId: String(job.id ?? ''),
+        message: 'Signal generation job completed',
+        payload: {
+          symbol: job.data.symbol,
+          timeframe: job.data.timeframe,
+          result: result.status,
+          signalId: result.signal?.id,
+        },
+      });
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -70,6 +87,11 @@ export class SignalGenerationProcessor extends WorkerHost {
           error: message,
         }),
       );
+      this.eventBus?.emit(TRADING_EVENTS.JOB_FAILED, {
+        source: 'signal-generation',
+        jobId: String(job.id ?? ''),
+        message,
+      });
       if (!retryable) {
         throw new UnrecoverableError(message);
       }

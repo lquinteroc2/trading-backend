@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './modules/auth/presentation/guards/jwt-auth.guard';
+import { RolesGuard } from './modules/auth/presentation/guards/roles.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { InstrumentsModule } from './modules/instruments/instruments.module';
 import { MarketDataModule } from './modules/market-data/market-data.module';
@@ -11,6 +14,17 @@ import { StrategiesModule } from './modules/strategies/strategies.module';
 import { BacktestingModule } from './modules/backtesting/backtesting.module';
 import { SupervisorModule } from './modules/supervisor/supervisor.module';
 import { SystemModule } from './modules/system/system.module';
+import { PerformanceModule } from './modules/performance/performance.module';
+import { RiskProfileModule } from './modules/risk-profile/risk-profile.module';
+import { LogsModule } from './modules/logs/logs.module';
+import { AgentDecisionsDashboardModule } from './modules/agent-decisions/agent-decisions-dashboard.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
+import { EconomicEventsModule } from './modules/economic-events/economic-events.module';
+import { FundamentalModule } from './modules/fundamental/fundamental.module';
+import { BrokerModule } from './modules/broker/broker.module';
+import { AssistedTradingModule } from './modules/assisted-trading/assisted-trading.module';
+import { LiveTradingModule } from './modules/live-trading/live-trading.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { QueuesModule } from './queues/queues.module';
@@ -36,10 +50,25 @@ import { validateConfig } from './config/env.validation';
     StrategiesModule,
     BacktestingModule,
     SystemModule,
+    EconomicEventsModule,
+    FundamentalModule,
+    PerformanceModule,
+    RiskProfileModule,
+    LogsModule,
+    RealtimeModule,
+    AgentDecisionsDashboardModule,
     AgentsModule,
     RiskModule,
     SupervisorModule,
     PaperTradingModule,
+    BrokerModule,
+    AssistedTradingModule,
+    LiveTradingModule,
+    AnalyticsModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
 export class AppModule {}

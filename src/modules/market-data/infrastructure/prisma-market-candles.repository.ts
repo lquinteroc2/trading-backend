@@ -44,7 +44,7 @@ export class PrismaMarketCandlesRepository implements MarketCandlesRepository {
         },
       },
       orderBy: { timestamp: query.order ?? 'asc' },
-      take: query.limit,
+      take: query.limit ?? 1000,
     });
     return candles.map((candle) => this.toEntity(candle));
   }

@@ -16,6 +16,8 @@ type EmaTrendParameters = {
   rsiSellMax?: number;
   atrStableMaxPercentOfPrice?: number;
   trendConsistencyCandles?: number;
+  blockRangingMarket?: boolean;
+  blockMtfConflict?: boolean;
 };
 
 @Injectable()
@@ -37,6 +39,21 @@ export class EmaTrendStrategyService implements IStrategy {
 
     const params = this.readParameters(strategy);
     const entryPrice = context.latestCandle.close;
+    const marketRegime = this.readMarketRegime(context.technicalAnalysis.metadata);
+    const multiTimeframe = this.readMultiTimeframe(context.technicalAnalysis.metadata);
+    const supportResistance = this.readSupportResistance(context.technicalAnalysis.metadata);
+    const blockRangingMarket =
+      this.config.get<boolean>('signals.blockRangingMarket') ?? params.blockRangingMarket ?? true;
+    const blockMtfConflict =
+      this.config.get<boolean>('signals.blockMtfConflict') ?? params.blockMtfConflict ?? true;
+
+    if (blockRangingMarket && marketRegime?.isRanging === true) {
+      return this.noSignal(strategy, entryPrice, 'NO_SIGNAL: market regime is ranging');
+    }
+    if (blockMtfConflict && multiTimeframe?.alignment === 'CONFLICTED') {
+      return this.noSignal(strategy, entryPrice, 'NO_SIGNAL: multi-timeframe alignment is conflicted');
+    }
+
     const bullishAlignment =
       indicators.ema20! > indicators.ema50! && indicators.ema50! > indicators.ema200!;
     const bearishAlignment =
@@ -67,6 +84,9 @@ export class EmaTrendStrategyService implements IStrategy {
     const tpMultiplier = this.config.get<number>('signals.atrTakeProfitMultiplier') ?? 3;
 
     if (bullishAlignment && rsiConfirmsBuy) {
+      if (this.isTooCloseToResistance(supportResistance, entryPrice)) {
+        return this.noSignal(strategy, entryPrice, 'NO_SIGNAL: price is too close to nearest resistance');
+      }
       const confidence = this.calculateConfidence({
         emaAligned: true,
         rsiConfirms: true,
@@ -91,6 +111,9 @@ export class EmaTrendStrategyService implements IStrategy {
     }
 
     if (bearishAlignment && rsiConfirmsSell) {
+      if (this.isTooCloseToSupport(supportResistance, entryPrice)) {
+        return this.noSignal(strategy, entryPrice, 'NO_SIGNAL: price is too close to nearest support');
+      }
       const confidence = this.calculateConfidence({
         emaAligned: true,
         rsiConfirms: true,
@@ -141,6 +164,38 @@ export class EmaTrendStrategyService implements IStrategy {
   private readParameters(strategy: StrategyEntity): EmaTrendParameters {
     const parameters = strategy.activeVersion?.parameters;
     return parameters && typeof parameters === 'object' ? (parameters as EmaTrendParameters) : {};
+  }
+
+  private readMarketRegime(metadata: unknown): { isRanging?: boolean } | null {
+    if (!metadata || typeof metadata !== 'object') {
+      return null;
+    }
+    const marketRegime = (metadata as { marketRegime?: unknown }).marketRegime;
+    return marketRegime && typeof marketRegime === 'object'
+      ? (marketRegime as { isRanging?: boolean })
+      : null;
+  }
+
+  private readMultiTimeframe(metadata: unknown): { alignment?: string } | null {
+    if (!metadata || typeof metadata !== 'object') {
+      return null;
+    }
+    const multiTimeframe = (metadata as { multiTimeframe?: unknown }).multiTimeframe;
+    return multiTimeframe && typeof multiTimeframe === 'object'
+      ? (multiTimeframe as { alignment?: string })
+      : null;
+  }
+
+  private readSupportResistance(
+    metadata: unknown,
+  ): { nearestSupport?: number | null; nearestResistance?: number | null } | null {
+    if (!metadata || typeof metadata !== 'object') {
+      return null;
+    }
+    const supportResistance = (metadata as { supportResistance?: unknown }).supportResistance;
+    return supportResistance && typeof supportResistance === 'object'
+      ? (supportResistance as { nearestSupport?: number | null; nearestResistance?: number | null })
+      : null;
   }
 
   private missingIndicators(indicators: TechnicalIndicators): string[] {
@@ -203,6 +258,30 @@ export class EmaTrendStrategyService implements IStrategy {
 
   private numberValue(value: unknown): number | undefined {
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  }
+
+  private isTooCloseToResistance(
+    supportResistance: { nearestResistance?: number | null } | null,
+    entryPrice: number,
+  ): boolean {
+    const nearestResistance = supportResistance?.nearestResistance;
+    return (
+      typeof nearestResistance === 'number' &&
+      nearestResistance > entryPrice &&
+      (nearestResistance - entryPrice) / entryPrice <= 0.003
+    );
+  }
+
+  private isTooCloseToSupport(
+    supportResistance: { nearestSupport?: number | null } | null,
+    entryPrice: number,
+  ): boolean {
+    const nearestSupport = supportResistance?.nearestSupport;
+    return (
+      typeof nearestSupport === 'number' &&
+      nearestSupport < entryPrice &&
+      (entryPrice - nearestSupport) / entryPrice <= 0.003
+    );
   }
 
   private roundPrice(value: number): number {

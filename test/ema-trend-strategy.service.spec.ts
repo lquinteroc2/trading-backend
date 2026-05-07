@@ -41,7 +41,10 @@ describe('EmaTrendStrategyService', () => {
     ),
   } as unknown as ConfigService);
 
-  const context = (indicators: Record<string, number>): StrategyContext => ({
+  const context = (
+    indicators: Record<string, number>,
+    metadataOverrides: Record<string, unknown> = {},
+  ): StrategyContext => ({
     instrumentId: 'instrument-id',
     symbol: 'BTCUSDT',
     timeframe: Timeframe.M15,
@@ -59,6 +62,7 @@ describe('EmaTrendStrategyService', () => {
         timeframe: Timeframe.M15,
         technicalBias: 'BULLISH',
         indicators,
+        ...metadataOverrides,
       },
       createdAt: new Date(),
     },
@@ -133,5 +137,31 @@ describe('EmaTrendStrategyService', () => {
 
     expect(result.direction).toBe(SignalDirection.NONE);
     expect(result.shouldCreateSignal).toBe(false);
+  });
+
+  it('blocks signal by ranging market metadata', () => {
+    const result = service.evaluate(
+      context(
+        { ema20: 120, ema50: 115, ema200: 100, rsi14: 60, atr14: 2 },
+        { marketRegime: { isRanging: true } },
+      ),
+      strategy,
+    );
+
+    expect(result.direction).toBe(SignalDirection.NONE);
+    expect(result.reason).toContain('ranging');
+  });
+
+  it('blocks signal by conflicted multi-timeframe metadata', () => {
+    const result = service.evaluate(
+      context(
+        { ema20: 120, ema50: 115, ema200: 100, rsi14: 60, atr14: 2 },
+        { multiTimeframe: { alignment: 'CONFLICTED' } },
+      ),
+      strategy,
+    );
+
+    expect(result.direction).toBe(SignalDirection.NONE);
+    expect(result.reason).toContain('multi-timeframe');
   });
 });

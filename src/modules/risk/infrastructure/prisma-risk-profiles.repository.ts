@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/database/prisma.service';
 import { RiskProfileEntity } from '../domain/risk-profile.entity';
-import { CreateRiskProfileData, RiskProfilesRepository } from '../domain/risk-profiles.repository';
+import {
+  CreateRiskProfileData,
+  RiskProfilesRepository,
+  UpdateRiskProfileData,
+} from '../domain/risk-profiles.repository';
 
 @Injectable()
 export class PrismaRiskProfilesRepository implements RiskProfilesRepository {
@@ -36,6 +40,21 @@ export class PrismaRiskProfilesRepository implements RiskProfilesRepository {
     return this.toEntity(profile);
   }
 
+  async updateActive(data: UpdateRiskProfileData): Promise<RiskProfileEntity | null> {
+    const active = await this.prisma.riskProfile.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!active) {
+      return null;
+    }
+    const profile = await this.prisma.riskProfile.update({
+      where: { id: active.id },
+      data,
+    });
+    return this.toEntity(profile);
+  }
+
   private toEntity(profile: {
     id: string;
     name: string;
@@ -45,6 +64,7 @@ export class PrismaRiskProfilesRepository implements RiskProfilesRepository {
     minRiskRewardRatio: Prisma.Decimal;
     isActive: boolean;
     createdAt: Date;
+    updatedAt: Date;
   }) {
     return new RiskProfileEntity(
       profile.id,
@@ -55,6 +75,7 @@ export class PrismaRiskProfilesRepository implements RiskProfilesRepository {
       profile.minRiskRewardRatio.toNumber(),
       profile.isActive,
       profile.createdAt,
+      profile.updatedAt,
     );
   }
 }

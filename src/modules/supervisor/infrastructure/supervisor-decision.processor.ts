@@ -1,7 +1,9 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
-import { AgentExecutionSource, SupervisorDecisionAction } from '@prisma/client';
+import { BadRequestException, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { AgentExecutionSource, SupervisorDecisionAction, SystemMode } from '@prisma/client';
 import { Job, UnrecoverableError } from 'bullmq';
+import { InternalEventBus } from '@/events/internal-event-bus.service';
+import { TRADING_EVENTS } from '@/events/trading-events';
 import { PaperTradingQueueProducer } from '@/queues/paper-trading-queue.producer';
 import { QUEUE_JOBS, QUEUE_NAMES } from '@/queues/queue.constants';
 import { SupervisorDecisionJobPayload } from '@/queues/supervisor-decision-queue.types';
@@ -19,6 +21,8 @@ export class SupervisorDecisionProcessor extends WorkerHost {
   constructor(
     private readonly supervisorAgent: SupervisorAgentService,
     private readonly paperTradingQueueProducer: PaperTradingQueueProducer,
+    @Optional()
+    private readonly eventBus?: InternalEventBus,
   ) {
     super();
   }
@@ -45,7 +49,10 @@ export class SupervisorDecisionProcessor extends WorkerHost {
         job.data.signalId,
         AgentExecutionSource.QUEUE,
       );
-      if (result.supervisorDecision.decision === SupervisorDecisionAction.OPERATE) {
+      if (
+        result.supervisorDecision.decision === SupervisorDecisionAction.OPERATE &&
+        result.systemMode === SystemMode.PAPER_TRADING
+      ) {
         await this.paperTradingQueueProducer.enqueueOpenTrade({ signalId: job.data.signalId });
       }
       this.logger.log(
@@ -59,6 +66,16 @@ export class SupervisorDecisionProcessor extends WorkerHost {
           durationMs: Date.now() - startedAt,
         }),
       );
+      this.eventBus?.emit(TRADING_EVENTS.JOB_COMPLETED, {
+        source: 'supervisor',
+        jobId: String(job.id ?? ''),
+        message: 'Supervisor decision job completed',
+        payload: {
+          signalId: job.data.signalId,
+          decisionId: result.supervisorDecision.id,
+          decision: result.supervisorDecision.decision,
+        },
+      });
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -76,6 +93,11 @@ export class SupervisorDecisionProcessor extends WorkerHost {
           error: message,
         }),
       );
+      this.eventBus?.emit(TRADING_EVENTS.JOB_FAILED, {
+        source: 'supervisor',
+        jobId: String(job.id ?? ''),
+        message,
+      });
       if (!retryable) {
         throw new UnrecoverableError(message);
       }

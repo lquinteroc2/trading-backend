@@ -24,6 +24,7 @@ export type FindSignalsQuery = {
   status?: SignalStatus;
   from?: Date;
   to?: Date;
+  limit?: number;
 };
 
 export type SignalCandleKey = {

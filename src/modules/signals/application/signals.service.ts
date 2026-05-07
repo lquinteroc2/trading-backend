@@ -47,6 +47,11 @@ export class SignalsService {
 
   async updateStatus(id: string, status: SignalStatus) {
     await this.findById(id);
-    return this.signalsRepository.updateStatus(id, status);
+    const signal = await this.signalsRepository.updateStatus(id, status);
+    this.eventBus?.emit(TRADING_EVENTS.SIGNAL_STATUS_UPDATED, {
+      signalId: signal.id,
+      status: signal.status,
+    });
+    return signal;
   }
 }

@@ -9,6 +9,7 @@ import {
 
 type WorkerTechnicalAnalysisResponse = Omit<TechnicalAnalysisResult, 'timeframe'> & {
   timeframe: string;
+  primaryTimeframe?: string;
 };
 
 @Injectable()
@@ -33,14 +34,16 @@ export class PythonTechnicalAnalysisProvider implements TechnicalAnalysisProvide
         body: JSON.stringify({
           symbol: params.symbol,
           timeframe: params.timeframe,
-          candles: params.candles.map((candle) => ({
-            timestamp: candle.timestamp.toISOString(),
-            open: candle.open,
-            high: candle.high,
-            low: candle.low,
-            close: candle.close,
-            volume: candle.volume,
-          })),
+          primaryTimeframe: params.primaryTimeframe ?? params.timeframe,
+          candles: this.serializeCandles(params.candles),
+          timeframes: params.timeframes
+            ? Object.fromEntries(
+                Object.entries(params.timeframes).map(([timeframe, candles]) => [
+                  timeframe,
+                  this.serializeCandles(candles ?? []),
+                ]),
+              )
+            : undefined,
         }),
       });
     } catch (error) {
@@ -75,6 +78,31 @@ export class PythonTechnicalAnalysisProvider implements TechnicalAnalysisProvide
         }`,
       );
     }
-    return { ...payload, timeframe: payload.timeframe as Timeframe };
+    return {
+      ...payload,
+      timeframe: payload.timeframe as Timeframe,
+      primaryTimeframe: (payload.primaryTimeframe ?? payload.timeframe) as Timeframe,
+      multiTimeframe: payload.multiTimeframe
+        ? {
+            ...payload.multiTimeframe,
+            primary: payload.multiTimeframe.primary as Timeframe,
+            confirmationTimeframes: payload.multiTimeframe.confirmationTimeframes as Timeframe[],
+            biasByTimeframe: payload.multiTimeframe.biasByTimeframe as Partial<
+              Record<Timeframe, 'BULLISH' | 'BEARISH' | 'NEUTRAL'>
+            >,
+          }
+        : undefined,
+    };
+  }
+
+  private serializeCandles(candles: AnalyzeCandlesParams['candles']) {
+    return candles.map((candle) => ({
+      timestamp: candle.timestamp.toISOString(),
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: candle.volume,
+    }));
   }
 }

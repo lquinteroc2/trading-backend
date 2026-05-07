@@ -1,7 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ApiTags } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
 import { Queue } from 'bullmq';
+import { Roles } from '@/modules/auth/presentation/decorators/roles.decorator';
 import { QUEUE_NAMES } from './queue.constants';
 
 @ApiTags('queues')
@@ -15,11 +17,13 @@ export class QueuesController {
   ) {}
 
   @Get('technical-analysis')
+  @Roles(Role.ADMIN, Role.TRADER, Role.VIEWER)
   async getTechnicalAnalysisJobs() {
     return this.getQueueJobs(this.technicalAnalysisQueue);
   }
 
   @Get('signal-generation')
+  @Roles(Role.ADMIN, Role.TRADER, Role.VIEWER)
   async getSignalGenerationJobs() {
     return this.getQueueJobs(this.signalGenerationQueue);
   }

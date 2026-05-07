@@ -8,5 +8,6 @@ export class RiskProfileEntity {
     public readonly minRiskRewardRatio: number,
     public readonly isActive: boolean,
     public readonly createdAt: Date,
+    public readonly updatedAt: Date,
   ) {}
 }

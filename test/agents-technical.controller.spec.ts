@@ -57,6 +57,24 @@ describe('AgentsController technical analysis endpoints', () => {
     });
   });
 
+  it('accepts primaryTimeframe for direct analysis', async () => {
+    const { controller, technicalAnalyze } = makeController();
+
+    await controller.analyzeTechnical({
+      instrumentId: '1d1ae365-2e9d-4f59-a047-158a84f7f125',
+      primaryTimeframe: Timeframe.M15,
+      confirmationTimeframes: [Timeframe.H1, Timeframe.H4],
+      limit: 1000,
+    });
+
+    expect(technicalAnalyze.execute).toHaveBeenCalledWith({
+      instrumentId: '1d1ae365-2e9d-4f59-a047-158a84f7f125',
+      primaryTimeframe: Timeframe.M15,
+      confirmationTimeframes: [Timeframe.H1, Timeframe.H4],
+      limit: 1000,
+    });
+  });
+
   it('enqueues technical analysis jobs', async () => {
     const { controller } = makeController();
 

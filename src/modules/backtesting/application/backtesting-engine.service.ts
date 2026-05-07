@@ -24,6 +24,9 @@ type RunBacktestEngineInput = {
   timeframe: Timeframe;
   initialBalance: number;
   riskPercent?: number;
+  useSupportResistanceFilter?: boolean;
+  useMarketRegimeFilter?: boolean;
+  useMultiTimeframeConfirmation?: boolean;
   candles: MarketCandleEntity[];
 };
 
@@ -43,6 +46,9 @@ export class BacktestingEngineService {
     const balanceHistory = [input.initialBalance];
     const riskPercent = input.riskPercent ?? 0.01;
     let balance = input.initialBalance;
+    let signalsBeforeFilters = 0;
+    let signalsAfterFilters = 0;
+    const filterReasons: Record<string, number> = {};
 
     for (let index = 0; index < input.candles.length; index += 1) {
       const candle = input.candles[index];
@@ -58,6 +64,7 @@ export class BacktestingEngineService {
         input.instrumentId,
         candle,
         historicalWindow,
+        input,
       );
       const result = this.strategyEngine.evaluateStrategy(input.strategy, {
         instrumentId: input.instrumentId,
@@ -67,6 +74,21 @@ export class BacktestingEngineService {
         latestCandle: candle,
         candles: historicalWindow,
       });
+      if (result?.shouldCreateSignal) {
+        signalsBeforeFilters += 1;
+        signalsAfterFilters += 1;
+      } else if (result?.reason.startsWith('NO_SIGNAL:')) {
+        const reason = result.reason;
+        if (
+          reason.includes('ranging') ||
+          reason.includes('multi-timeframe') ||
+          reason.includes('nearest resistance') ||
+          reason.includes('nearest support')
+        ) {
+          signalsBeforeFilters += 1;
+          filterReasons[reason] = (filterReasons[reason] ?? 0) + 1;
+        }
+      }
 
       const nextCandle = input.candles[index + 1];
       if (
@@ -111,7 +133,13 @@ export class BacktestingEngineService {
       trades.push(closedTrade);
     }
 
-    const metrics = this.metrics.calculate(input.initialBalance, balanceHistory, trades);
+    const metrics = {
+      ...this.metrics.calculate(input.initialBalance, balanceHistory, trades),
+      signalsBeforeFilters,
+      signalsAfterFilters,
+      filteredSignals: Math.max(0, signalsBeforeFilters - signalsAfterFilters),
+      filterReasons,
+    };
     return { trades, metrics };
   }
 
@@ -204,7 +232,28 @@ export class BacktestingEngineService {
     instrumentId: string,
     candle: MarketCandleEntity,
     candles: MarketCandleEntity[],
+    options: Pick<
+      RunBacktestEngineInput,
+      'useSupportResistanceFilter' | 'useMarketRegimeFilter' | 'useMultiTimeframeConfirmation'
+    >,
   ): AgentDecisionEntity {
+    const indicators = this.indicators.calculate(candles);
+    const metadata: Record<string, unknown> = { indicators };
+    if (options.useMarketRegimeFilter) {
+      metadata.marketRegime = this.syntheticMarketRegime(candle, indicators);
+    }
+    if (options.useSupportResistanceFilter) {
+      metadata.supportResistance = this.syntheticSupportResistance(candle, candles);
+    }
+    if (options.useMultiTimeframeConfirmation) {
+      metadata.multiTimeframe = {
+        primary: candle.timeframe,
+        confirmationTimeframes: [],
+        alignment: 'PARTIAL',
+        biasByTimeframe: { [candle.timeframe]: 'NEUTRAL' },
+      };
+    }
+
     return new AgentDecisionEntity(
       `backtest-analysis:${candle.id}`,
       AgentType.TECHNICAL,
@@ -214,9 +263,56 @@ export class BacktestingEngineService {
       AgentExecutionSource.MANUAL,
       100,
       'Synthetic technical analysis for deterministic backtesting.',
-      { indicators: this.indicators.calculate(candles) },
+      metadata,
       candle.timestamp,
     );
+  }
+
+  private syntheticMarketRegime(
+    candle: MarketCandleEntity,
+    indicators: ReturnType<BacktestingIndicatorsService['calculate']>,
+  ) {
+    const ema20 = indicators.ema20 ?? candle.close;
+    const ema50 = indicators.ema50 ?? candle.close;
+    const atrPercent = indicators.atr14 ? indicators.atr14 / candle.close : 0;
+    const isRanging = Math.abs(ema20 - ema50) / candle.close < 0.002;
+    return {
+      regime: isRanging ? 'RANGING' : 'TRENDING',
+      isRanging,
+      volatilityState: atrPercent < 0.003 ? 'LOW' : atrPercent > 0.03 ? 'HIGH' : 'NORMAL',
+      atrPercent,
+      reason: isRanging ? 'EMAs close during backtest window' : 'EMAs separated during backtest window',
+    };
+  }
+
+  private syntheticSupportResistance(candle: MarketCandleEntity, candles: MarketCandleEntity[]) {
+    const window = candles.slice(-100);
+    const supports = window
+      .filter((candidate) => candidate.low <= candle.close)
+      .sort((left, right) => Math.abs(candle.close - left.low) - Math.abs(candle.close - right.low))
+      .slice(0, 1)
+      .map((candidate) => ({
+        price: candidate.low,
+        touches: 1,
+        strength: 'WEAK',
+      }));
+    const resistances = window
+      .filter((candidate) => candidate.high >= candle.close)
+      .sort(
+        (left, right) => Math.abs(candle.close - left.high) - Math.abs(candle.close - right.high),
+      )
+      .slice(0, 1)
+      .map((candidate) => ({
+        price: candidate.high,
+        touches: 1,
+        strength: 'WEAK',
+      }));
+    return {
+      supports,
+      resistances,
+      nearestSupport: supports[0]?.price ?? null,
+      nearestResistance: resistances[0]?.price ?? null,
+    };
   }
 
   private roundMoney(value: number): number {

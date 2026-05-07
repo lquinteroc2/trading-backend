@@ -1,0 +1,5 @@
+ALTER TABLE "BacktestRun"
+ADD COLUMN "signalsBeforeFilters" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "signalsAfterFilters" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "filteredSignals" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "filterReasons" JSONB;

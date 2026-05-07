@@ -1,6 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { Job, UnrecoverableError } from 'bullmq';
+import { InternalEventBus } from '@/events/internal-event-bus.service';
+import { TRADING_EVENTS } from '@/events/trading-events';
 import { QUEUE_JOBS, QUEUE_NAMES } from '@/queues/queue.constants';
 import {
   PaperTradeEvaluateOpenTradesJobPayload,
@@ -15,7 +17,11 @@ const paperTradingConcurrency = parseInt(process.env.PAPER_TRADING_QUEUE_CONCURR
 export class PaperTradingProcessor extends WorkerHost {
   private readonly logger = new Logger(PaperTradingProcessor.name);
 
-  constructor(private readonly engine: PaperTradingEngineService) {
+  constructor(
+    private readonly engine: PaperTradingEngineService,
+    @Optional()
+    private readonly eventBus?: InternalEventBus,
+  ) {
     super();
   }
 
@@ -42,6 +48,14 @@ export class PaperTradingProcessor extends WorkerHost {
           durationMs: Date.now() - startedAt,
         }),
       );
+      this.eventBus?.emit(TRADING_EVENTS.JOB_COMPLETED, {
+        source: 'paper-trading',
+        jobId: String(job.id ?? ''),
+        message: 'Paper trading job completed',
+        payload: {
+          jobName: job.name,
+        },
+      });
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -59,6 +73,11 @@ export class PaperTradingProcessor extends WorkerHost {
           error: message,
         }),
       );
+      this.eventBus?.emit(TRADING_EVENTS.JOB_FAILED, {
+        source: 'paper-trading',
+        jobId: String(job.id ?? ''),
+        message,
+      });
       if (!retryable) {
         throw new UnrecoverableError(message);
       }

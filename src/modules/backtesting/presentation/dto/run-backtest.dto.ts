@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Timeframe } from '@prisma/client';
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNumber,
@@ -44,4 +45,19 @@ export class RunBacktestDto {
   @Min(0.0001)
   @Max(1)
   riskPercent?: number;
+
+  @ApiPropertyOptional({ example: true, default: false })
+  @IsOptional()
+  @IsBoolean()
+  useSupportResistanceFilter?: boolean;
+
+  @ApiPropertyOptional({ example: true, default: false })
+  @IsOptional()
+  @IsBoolean()
+  useMarketRegimeFilter?: boolean;
+
+  @ApiPropertyOptional({ example: true, default: false })
+  @IsOptional()
+  @IsBoolean()
+  useMultiTimeframeConfirmation?: boolean;
 }

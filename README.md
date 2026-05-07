@@ -1,76 +1,27 @@
 # Trading Backend
 
-Backend privado para una plataforma de trading inteligente. El Sprint 1 deja lista la base para instrumentos, velas OHLCV, señales, decisiones de agentes, riesgo, paper trading, colas y futura automatizacion.
+Backend privado para una plataforma de trading asistido: ingesta de mercado, agentes tecnicos y
+fundamentales, generacion de senales, riesgo, supervisor, paper trading, assisted trading,
+LIVE_LIMITED con MT5, analytics y eventos realtime.
 
 ## Stack
 
-- NestJS + TypeScript
-- PostgreSQL + Prisma ORM
+- NestJS 10 + TypeScript
+- PostgreSQL + Prisma
 - Redis + BullMQ
-- Docker Compose
+- FastAPI workers en `services/agents` y `services/mt5-worker`
 - Swagger/OpenAPI
-- Jest
-- Arquitectura hexagonal por modulo: `domain`, `application`, `infrastructure`, `presentation`
+- Jest para backend Node
+- Pytest para workers Python
+- Arquitectura por modulo: `domain`, `application`, `infrastructure`, `presentation`
 
 ## Requisitos
 
 - Node.js 22+
 - Docker y Docker Compose
+- Python 3.11+ para correr los workers fuera de Docker
 
-## Variables de entorno
-
-```bash
-cp .env.example .env
-```
-
-Credenciales iniciales del seed:
-
-- Email: `admin@trading.local`
-- Password: `ChangeMe123!`
-
-Puedes cambiarlas con `ADMIN_EMAIL` y `ADMIN_PASSWORD`.
-
-Variables de ingesta historica de Sprint 2:
-
-```env
-BINANCE_API_BASE_URL=https://api.binance.com
-MARKET_DATA_DEFAULT_PROVIDER=BINANCE
-MARKET_DATA_SYNC_DEFAULT_LIMIT=1000
-MARKET_DATA_SYNC_MAX_LIMIT=1000
-```
-
-Variables de analisis tecnico de Sprint 3:
-
-```env
-TECHNICAL_AGENT_BASE_URL=http://localhost:8000
-TECHNICAL_ANALYSIS_MIN_CANDLES=200
-TECHNICAL_ANALYSIS_DEFAULT_LIMIT=500
-TECHNICAL_ANALYSIS_CANDLES_LIMIT=500
-TECHNICAL_ANALYSIS_TIMEOUT_MS=8000
-TECHNICAL_ANALYSIS_QUEUE_CONCURRENCY=5
-TECHNICAL_ANALYSIS_QUEUE_DEBOUNCE_MS=30000
-```
-
-## Ejecutar con Docker Compose
-
-```bash
-docker compose up --build
-```
-
-La API queda disponible en:
-
-- API: `http://localhost:3000/api/v1`
-- Swagger: `http://localhost:3000/api/docs`
-- Health: `http://localhost:3000/api/v1/health`
-- Worker tecnico: `http://localhost:8000/health`
-
-Para cargar seed dentro del contenedor:
-
-```bash
-docker compose exec backend npm run prisma:seed
-```
-
-## Ejecutar en local
+## Arranque Rapido
 
 ```bash
 npm install
@@ -82,50 +33,32 @@ npm run prisma:seed
 npm run start:dev
 ```
 
-Si ejecutas local fuera de Docker, usa en `.env`:
+URLs principales:
 
-```env
-DATABASE_URL=postgresql://trading:trading@localhost:5432/trading?schema=public
-REDIS_HOST=localhost
-```
+- API: `http://localhost:3000/api/v1`
+- Swagger: `http://localhost:3000/api/docs`
+- Health backend: `http://localhost:3000/api/v1/health`
+- Technical worker: `http://localhost:8000/health`
+- MT5 worker: `http://localhost:8010/health`
 
-## Migraciones
-
-Crear/aplicar migracion en desarrollo:
-
-```bash
-npm run prisma:migrate
-```
-
-Aplicar migraciones en entornos tipo produccion:
+Con Docker Compose:
 
 ```bash
-npm run prisma:deploy
+docker compose up --build
+docker compose exec backend npm run prisma:seed
 ```
 
-Regenerar cliente Prisma:
+## Seguridad
 
-```bash
-npm run prisma:generate
-```
+La API es privada por defecto. Todas las rutas requieren JWT salvo rutas marcadas como publicas
+internamente, por ejemplo `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout` y
+`GET /health`.
 
-## Tests
+Roles soportados:
 
-```bash
-npm test
-```
-
-Incluye pruebas unitarias para calculo de riesgo, servicio de instrumentos, servicio de señales,
-provider Binance, sincronizacion historica, controller de sync e integracion de analisis tecnico.
-
-Tests del worker Python:
-
-```bash
-cd services/agents
-pytest
-```
-
-## Endpoints principales
+- `ADMIN`: configuracion, limites, ejecucion live, operaciones administrativas.
+- `TRADER`: operacion asistida, paper trading, agentes, backtesting y consultas.
+- `VIEWER`: consultas de solo lectura.
 
 Login:
 
@@ -135,510 +68,295 @@ curl -X POST http://localhost:3000/api/v1/auth/login \
   -d '{"email":"admin@trading.local","password":"ChangeMe123!"}'
 ```
 
-Crear instrumento:
+El login devuelve `accessToken` y tambien setea cookies HTTP-only para integracion con frontend.
 
-```bash
-curl -X POST http://localhost:3000/api/v1/instruments \
-  -H "Content-Type: application/json" \
-  -d '{"symbol":"XAUUSD","name":"Gold vs US Dollar","marketType":"COMMODITY","brokerSymbol":"XAUUSD"}'
+## Variables Principales
+
+Minimas:
+
+```env
+DATABASE_URL=postgresql://trading:trading@localhost:5432/trading?schema=public
+JWT_SECRET=change-me
+JWT_REFRESH_SECRET=change-me-too
+CORS_ORIGINS=http://localhost:3001
+REDIS_HOST=localhost
+REDIS_PORT=6379
 ```
 
-Guardar vela:
+Market data y agentes:
 
-```bash
-curl -X POST http://localhost:3000/api/v1/market-data/candles \
-  -H "Content-Type: application/json" \
-  -d '{"instrumentId":"<instrument-id>","timeframe":"M5","open":2000,"high":2010,"low":1995,"close":2005,"volume":1000,"timestamp":"2026-04-30T22:00:00.000Z","source":"manual"}'
+```env
+BINANCE_API_BASE_URL=https://api.binance.com
+MARKET_DATA_DEFAULT_PROVIDER=BINANCE
+MARKET_DATA_SYNC_DEFAULT_LIMIT=1000
+MARKET_DATA_SYNC_MAX_LIMIT=1000
+TECHNICAL_AGENT_BASE_URL=http://localhost:8000
+TECHNICAL_ANALYSIS_MIN_CANDLES=200
+TECHNICAL_ANALYSIS_DEFAULT_LIMIT=500
+TECHNICAL_ANALYSIS_TIMEOUT_MS=8000
+TECHNICAL_ANALYSIS_QUEUE_CONCURRENCY=5
+TECHNICAL_ANALYSIS_QUEUE_DEBOUNCE_MS=30000
 ```
 
-### Sprint 2: ingesta historica desde Binance
-
-El modulo de market data ahora incluye una abstraccion de proveedores y una implementacion inicial
-para Binance. El dominio trabaja con velas normalizadas internas; Binance queda como adaptador de
-infraestructura.
-
-Antes de sincronizar:
-
-```bash
-npm run prisma:migrate
-npm run prisma:seed
-```
-
-Obtén el token:
-
-```bash
-curl -X POST http://localhost:3000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@trading.local","password":"ChangeMe123!"}'
-```
-
-Obtén el `instrumentId` de BTCUSDT:
-
-```bash
-curl http://localhost:3000/api/v1/instruments \
-  -H "Authorization: Bearer TOKEN"
-```
-
-Sincronizar 1.000 velas BTCUSDT M15 directamente:
-
-```bash
-curl -X POST http://localhost:3000/api/v1/market-data/sync \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
-    "timeframe": "M15",
-    "startTime": "2024-01-01T00:00:00.000Z",
-    "endTime": "2024-01-15T00:00:00.000Z",
-    "limit": 1000,
-    "provider": "BINANCE"
-  }'
-```
-
-Encolar el mismo sync con BullMQ:
-
-```bash
-curl -X POST http://localhost:3000/api/v1/market-data/sync/enqueue \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
-    "timeframe": "M15",
-    "startTime": "2024-01-01T00:00:00.000Z",
-    "limit": 1000,
-    "provider": "BINANCE"
-  }'
-```
-
-Para que un sync manual dispare un unico analisis tecnico al terminar, agrega
-`"triggerAnalysis": true`. Sin ese flag, los syncs masivos no encolan analisis para evitar cientos
-de jobs redundantes.
-
-Consultar velas guardadas:
-
-```bash
-curl "http://localhost:3000/api/v1/market-data/candles?instrumentId=ID_DEL_INSTRUMENTO_BTCUSDT&timeframe=M15&from=2024-01-01T00:00:00.000Z&to=2024-01-15T00:00:00.000Z&limit=1000&order=asc" \
-  -H "Authorization: Bearer TOKEN"
-```
-
-Consultar auditoria de syncs:
-
-```bash
-curl "http://localhost:3000/api/v1/market-data/sync-jobs?provider=BINANCE&instrumentId=ID_DEL_INSTRUMENTO_BTCUSDT&timeframe=M15" \
-  -H "Authorization: Bearer TOKEN"
-
-curl http://localhost:3000/api/v1/market-data/sync-jobs/SYNC_JOB_ID \
-  -H "Authorization: Bearer TOKEN"
-```
-
-Para verificar duplicados, ejecuta dos veces el mismo `POST /market-data/sync`. La segunda respuesta
-debe reportar `insertedCount` menor que `fetchedCount` y `skippedDuplicates` mayor que cero. La base
-tambien protege esto con el constraint unico `instrumentId + timeframe + timestamp`.
-
-### Sprint 3: worker Python de analisis tecnico
-
-El worker FastAPI vive en `services/agents` y calcula EMA20, EMA50, EMA200, RSI14 y ATR14 sin
-generar señales ni ejecutar trades.
-
-Instalar y correr el worker local:
-
-```bash
-cd services/agents
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-Probar health:
-
-```bash
-curl http://localhost:8000/health
-```
-
-Con Docker Compose, el servicio `technical-agent-worker` se levanta junto a backend, PostgreSQL y
-Redis:
-
-```bash
-docker compose up --build
-```
-
-Analizar BTCUSDT desde el backend con velas guardadas en Sprint 2:
-
-```bash
-curl -X POST http://localhost:3000/api/v1/agents/technical/analyze \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
-    "timeframe": "M15",
-    "limit": 1000
-  }'
-```
-
-Encolar el mismo analisis con BullMQ:
-
-```bash
-curl -X POST http://localhost:3000/api/v1/agents/technical/analyze/enqueue \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
-    "timeframe": "M15",
-    "limit": 1000
-  }'
-```
-
-### Sprint 4: analisis tecnico automatico por eventos y colas
-
-El flujo automatico queda asi:
-
-```text
-MarketCandle creada -> CANDLE_CLOSED -> technical-analysis-queue
--> TechnicalAnalysisProcessor -> worker Python -> AgentDecision
-```
-
-El `POST /market-data/candles` emite `CANDLE_CLOSED` y encola
-`technical-analysis.analyze` con debounce por `symbol + timeframe`. Los syncs historicos no disparan
-analisis salvo que envies `triggerAnalysis=true`; en ese caso se encola un solo job para la ultima
-vela sincronizada.
-
-Encolar manualmente un analisis:
-
-```bash
-curl -X POST http://localhost:3000/api/v1/agents/technical/analyze/enqueue \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
-    "timeframe": "M15",
-    "limit": 500
-  }'
-```
-
-Ver estado de jobs:
-
-```bash
-curl http://localhost:3000/api/v1/queues/technical-analysis \
-  -H "Authorization: Bearer TOKEN"
-```
-
-Simular una nueva vela y disparar el flujo automatico:
-
-```bash
-curl -X POST http://localhost:3000/api/v1/market-data/candles \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
-    "timeframe": "M15",
-    "open": 42000,
-    "high": 42100,
-    "low": 41900,
-    "close": 42050,
-    "volume": 100,
-    "timestamp": "2026-05-01T12:00:00.000Z",
-    "source": "REALTIME"
-  }'
-```
-
-Ver logs del processor:
-
-```bash
-docker compose logs -f backend | grep technical_analysis_job
-```
-
-Forzar retries: detén el worker Python o configura `TECHNICAL_AGENT_BASE_URL` a una URL invalida y
-encola un analisis. Los errores HTTP/timeout se reintentan hasta 3 veces con backoff exponencial.
-Para ver un fallo no reintentable, encola un instrumento/timeframe con menos de
-`TECHNICAL_ANALYSIS_MIN_CANDLES`; el job queda fallido sin retry util.
-
-Ver decisiones guardadas:
-
-```bash
-docker compose exec postgres psql -U trading -d trading \
-  -c "select id, \"agentType\", \"executionSource\", decision, \"confidenceScore\", \"createdAt\" from \"AgentDecision\" order by \"createdAt\" desc limit 5;"
-```
-
-Consultar el ultimo analisis tecnico guardado:
-
-```bash
-curl "http://localhost:3000/api/v1/agents/technical/latest?instrumentId=ID_DEL_INSTRUMENTO_BTCUSDT&timeframe=M15" \
-  -H "Authorization: Bearer TOKEN"
-```
-
-Verificar persistencia en PostgreSQL:
-
-```bash
-docker compose exec postgres psql -U trading -d trading \
-  -c "select id, \"agentType\", decision, \"confidenceScore\", \"createdAt\" from \"AgentDecision\" where \"instrumentId\" = 'ID_DEL_INSTRUMENTO_BTCUSDT' order by \"createdAt\" desc limit 5;"
-```
-
-### Sprint 5: generacion de señales con EMA Trend Strategy
-
-El flujo automatico queda asi:
-
-```text
-candle -> technical-analysis-queue -> AgentDecision TECHNICAL
--> signal-generation-queue -> StrategyEngine -> EMA_TREND_STRATEGY -> TradingSignal
-```
-
-La estrategia inicial es `EMA_TREND_STRATEGY` version `v1`. Genera `BUY` cuando
-`EMA20 > EMA50 > EMA200` y `RSI14` esta entre `45` y `70`; genera `SELL` cuando
-`EMA20 < EMA50 < EMA200` y `RSI14` esta entre `30` y `55`. Si las EMAs o RSI no
-confirman, retorna `NO_SIGNAL` y no guarda señal.
-
-Cada señal guarda:
-
-- `strategyId`
-- `timeframe`
-- `direction`
-- `entryPrice`
-- `stopLoss`
-- `takeProfit`
-- `confidenceScore`
-- `reason`
-- `candleTimestamp`
-
-Generar una señal manual desde el ultimo analisis tecnico:
-
-```bash
-curl -X POST http://localhost:3000/api/v1/signals/generate \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
-    "timeframe": "M15"
-  }'
-```
-
-Consultar señales:
-
-```bash
-curl "http://localhost:3000/api/v1/signals?instrumentId=ID_DEL_INSTRUMENTO_BTCUSDT&timeframe=M15&status=CREATED" \
-  -H "Authorization: Bearer TOKEN"
-```
-
-Consultar una señal puntual:
-
-```bash
-curl http://localhost:3000/api/v1/signals/SIGNAL_ID \
-  -H "Authorization: Bearer TOKEN"
-```
-
-Ver jobs de generacion:
-
-```bash
-curl http://localhost:3000/api/v1/queues/signal-generation \
-  -H "Authorization: Bearer TOKEN"
-```
-
-Evitar duplicados:
-
-La base de datos tiene una restriccion unica por
-`instrumentId + timeframe + candleTimestamp`. Antes de ejecutar la estrategia, el servicio busca si ya
-existe una señal para esa vela; si existe, responde `SKIPPED_DUPLICATE`.
-
-Ajustar parametros operativos:
+Senales, supervisor y paper trading:
 
 ```env
 SIGNAL_MIN_CONFIDENCE=50
 SIGNAL_ATR_SL_MULTIPLIER=1.5
 SIGNAL_ATR_TP_MULTIPLIER=3
-SIGNAL_GENERATION_QUEUE_CONCURRENCY=5
-PAPER_TRADING_DEFAULT_BALANCE=10000
-PAPER_TRADING_MAX_OPEN_TRADES_PER_SYMBOL=1
-PAPER_TRADING_ENABLED=true
-PAPER_TRADING_QUEUE_CONCURRENCY=5
-```
-
-Los parametros versionados de estrategia viven en `StrategyVersion.parameters`; para `v1` incluyen
-rangos RSI, limite de ATR estable y numero de velas usadas para confirmar consistencia de tendencia.
-
-Ejemplo completo BTCUSDT:
-
-```bash
-# 1. Sincroniza velas con triggerAnalysis=true para disparar analisis y señal
-curl -X POST http://localhost:3000/api/v1/market-data/sync \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "instrumentId": "ID_DEL_INSTRUMENTO_BTCUSDT",
-    "timeframe": "M15",
-    "startTime": "2026-04-25T00:00:00.000Z",
-    "limit": 500,
-    "triggerAnalysis": true
-  }'
-
-# 2. Revisa el ultimo analisis tecnico
-curl "http://localhost:3000/api/v1/agents/technical/latest?instrumentId=ID_DEL_INSTRUMENTO_BTCUSDT&timeframe=M15" \
-  -H "Authorization: Bearer TOKEN"
-
-# 3. Revisa la señal creada
-curl "http://localhost:3000/api/v1/signals?instrumentId=ID_DEL_INSTRUMENTO_BTCUSDT&timeframe=M15" \
-  -H "Authorization: Bearer TOKEN"
-```
-
-Calcular riesgo:
-
-```bash
-curl -X POST http://localhost:3000/api/v1/risk/calculate-position-size \
-  -H "Content-Type: application/json" \
-  -d '{"accountBalance":10000,"riskPercent":1,"entryPrice":2000,"stopLoss":1990,"takeProfit":2020,"instrumentId":"<instrument-id>"}'
-```
-
-### Sprint 8: Paper Trading Engine
-
-El flujo automatico queda asi:
-
-```text
-TradingSignal -> Risk Agent APPROVE -> paper-trading-queue
--> PaperTradingEngine -> PaperTrade OPEN
--> CANDLE_CLOSED -> evaluate-open-trades -> cierre por SL/TP -> balance actualizado
-```
-
-El seed crea una cuenta `DEFAULT_PAPER_ACCOUNT` con balance inicial `10000` USD. Tambien puedes crear
-cuentas manualmente:
-
-```bash
-curl -X POST http://localhost:3000/api/v1/paper-trading/accounts \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"MY_PAPER_ACCOUNT","initialBalance":10000,"currency":"USD"}'
-```
-
-Consultar balance y cuentas:
-
-```bash
-curl http://localhost:3000/api/v1/paper-trading/accounts \
-  -H "Authorization: Bearer TOKEN"
-
-curl http://localhost:3000/api/v1/paper-trading/accounts/ACCOUNT_ID \
-  -H "Authorization: Bearer TOKEN"
-```
-
-Abrir un trade simulado desde una señal aprobada por riesgo:
-
-```bash
-curl -X POST http://localhost:3000/api/v1/paper-trading/trades/open \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"signalId":"SIGNAL_ID","accountId":"ACCOUNT_ID"}'
-```
-
-Si omites `accountId`, el motor usa la primera cuenta paper activa. La apertura exige señal
-`APPROVED` o `UNDER_REVIEW`, `AgentDecision` de tipo `RISK` con `APPROVE`, SL/TP validos, position
-size del assessment/metadata de riesgo, y que no exista un trade abierto del mismo instrumento ni un
-trade duplicado para el mismo `signalId`.
-
-Evaluar trades abiertos con una vela:
-
-```bash
-curl -X POST http://localhost:3000/api/v1/paper-trading/evaluate-candle \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"candleId":"CANDLE_ID"}'
-```
-
-El cierre por vela es conservador: si SL y TP ocurren en la misma vela, se toma primero el stop loss.
-Para BUY se cierra en SL cuando `low <= stopLoss` y en TP cuando `high >= takeProfit`; para SELL se
-cierra en SL cuando `high >= stopLoss` y en TP cuando `low <= takeProfit`.
-
-Cerrar manualmente:
-
-```bash
-curl -X PATCH http://localhost:3000/api/v1/paper-trading/trades/TRADE_ID/close \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"closePrice":65000,"closeReason":"MANUAL"}'
-```
-
-Consultar trades abiertos/cerrados:
-
-```bash
-curl "http://localhost:3000/api/v1/paper-trading/trades?accountId=ACCOUNT_ID&status=OPEN" \
-  -H "Authorization: Bearer TOKEN"
-
-curl "http://localhost:3000/api/v1/paper-trading/trades?instrumentId=INSTRUMENT_ID&result=WIN" \
-  -H "Authorization: Bearer TOKEN"
-```
-
-El PnL se calcula como `(closePrice - entryPrice) * positionSize` en BUY y
-`(entryPrice - closePrice) * positionSize` en SELL. Al cerrar, el balance de la cuenta se actualiza
-con `balance + pnl` y se registra auditoria estructurada en logs (`paper_trade_opened` y
-`paper_trade_closed`).
-
-### Sprint 9: Supervisor Agent
-
-El flujo automatico queda:
-
-```text
-signal -> risk evaluation -> supervisor decision -> paper trade
-```
-
-El Risk Agent ya no abre trades directamente. Cuando termina una evaluacion de riesgo emite
-`RISK_EVALUATED`, se encola `supervisor.decide` en `supervisor-decision-queue`, el Supervisor registra
-su decision en `SupervisorDecision` y tambien en `AgentDecision` con `agentType = SUPERVISOR`.
-Solo si la decision final es `OPERATE`, se encola `paper-trade.open`.
-
-Reglas principales del Supervisor:
-
-- `OPERATE`: confianza >= `SUPERVISOR_MIN_CONFIDENCE`, riesgo aprobado, modo `PAPER_TRADING`, sin kill switch, sin trade abierto del mismo instrumento, `openTrades < SUPERVISOR_MAX_OPEN_TRADES` y drawdown diario bajo el limite.
-- `WAIT`: senal valida con confianza media, por defecto entre 50 y 69.
-- `BLOCK`: riesgo rechazado, confianza menor a 50, kill switch activo, modo `SAFE_MODE`/`PAUSED`, trade abierto del mismo instrumento o drawdown diario excedido.
-
-Variables:
-
-```env
+SIGNAL_BLOCK_RANGING_MARKET=true
+SIGNAL_BLOCK_MTF_CONFLICT=true
 SUPERVISOR_MIN_CONFIDENCE=70
 SUPERVISOR_MAX_OPEN_TRADES=1
 SUPERVISOR_MAX_DRAWDOWN=0.02
-SUPERVISOR_DECISION_QUEUE_CONCURRENCY=5
+PAPER_TRADING_ENABLED=true
+PAPER_TRADING_DEFAULT_BALANCE=10000
+PAPER_TRADING_MAX_OPEN_TRADES_PER_SYMBOL=1
 ```
 
-Endpoints:
+Broker MT5 y live limited:
+
+```env
+ENABLE_LIVE_TRADING=false
+BROKER_PROVIDER=MT5
+MT5_WORKER_BASE_URL=http://localhost:8010
+MT5_DRY_RUN=true
+MT5_REQUEST_TIMEOUT_MS=10000
+```
+
+## Modulos
+
+- `auth`: login, refresh tokens, cookies, JWT y roles.
+- `instruments`: instrumentos negociables y simbolos de broker.
+- `market-data`: velas OHLCV, sync historico y auditoria de syncs.
+- `agents`: analisis tecnico via worker Python y decisiones de agentes.
+- `fundamental`: evaluacion fundamental basada en eventos economicos.
+- `signals` / `strategies`: EMA trend strategy y generacion de senales.
+- `risk`: sizing y evaluaciones de riesgo.
+- `supervisor`: decision final `OPERATE`, `WAIT` o `BLOCK`.
+- `paper-trading`: motor de cuentas y trades simulados.
+- `assisted-trading`: aprobacion/rechazo manual.
+- `broker`: conector MT5, dry-runs y auditoria.
+- `live-trading`: ejecucion real limitada con multiples compuertas.
+- `analytics`: metricas, agrupaciones, equity curve y CSV.
+- `realtime`: eventos server-sent events para frontend.
+- `queues`: BullMQ para analisis, senales, riesgo, supervisor, broker y paper trading.
+
+## Flujos Principales
+
+Analisis y senales:
+
+```text
+MarketCandle -> CANDLE_CLOSED -> technical-analysis-queue
+-> TechnicalAnalysisProcessor -> services/agents -> AgentDecision TECHNICAL
+-> signal-generation-queue -> TradingSignal
+```
+
+Riesgo, supervisor y paper trading:
+
+```text
+TradingSignal -> RiskAssessment -> SupervisorDecision
+-> PAPER_TRADING: PaperTrade OPEN automatico si OPERATE
+-> ASSISTED_TRADING: PENDING_MANUAL_APPROVAL
+```
+
+Assisted y MT5 dry-run:
+
+```text
+PENDING_MANUAL_APPROVAL -> ManualTradingDecision APPROVE
+-> PAPER_TRADING | MT5_DRY_RUN | NONE
+```
+
+LIVE_LIMITED:
+
+```text
+Manual approval + ADMIN + confirmation text + ENABLE_LIVE_TRADING=true
++ MT5_DRY_RUN=false + SystemMode=LIVE_LIMITED + killSwitch=false
+-> requested LiveTrade -> MT5 order -> EXECUTED/FAILED audit
+```
+
+La ejecucion live reserva un `LiveTrade.REQUESTED` antes de llamar al broker para reducir doble
+ejecucion concurrente. Los intentos `FAILED` no bloquean un reintento posterior.
+
+## Endpoints Frecuentes
+
+Usa `Authorization: Bearer TOKEN` en todas las rutas privadas.
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/agents/supervisor/decide \
-  -H "Content-Type: application/json" \
+# Instrumentos
+curl http://localhost:3000/api/v1/instruments -H "Authorization: Bearer TOKEN"
+
+# Crear instrumento
+curl -X POST http://localhost:3000/api/v1/instruments \
   -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"symbol":"BTCUSDT","name":"Bitcoin / Tether","marketType":"CRYPTO","brokerSymbol":"BTCUSDT"}'
+
+# Sincronizar velas
+curl -X POST http://localhost:3000/api/v1/market-data/sync \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"instrumentId":"INSTRUMENT_ID","timeframe":"M15","startTime":"2024-01-01T00:00:00.000Z","limit":1000,"provider":"BINANCE","triggerAnalysis":true}'
+
+# Consultar velas, con limite maximo 5000
+curl "http://localhost:3000/api/v1/market-data/candles?instrumentId=INSTRUMENT_ID&timeframe=M15&limit=1000&order=asc" \
+  -H "Authorization: Bearer TOKEN"
+
+# Analisis tecnico manual
+curl -X POST http://localhost:3000/api/v1/agents/technical/analyze \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"instrumentId":"INSTRUMENT_ID","primaryTimeframe":"M15","confirmationTimeframes":["H1","H4"],"limit":1000}'
+
+# Generar senal manual
+curl -X POST http://localhost:3000/api/v1/signals/generate \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"instrumentId":"INSTRUMENT_ID","timeframe":"M15"}'
+
+# Evaluar riesgo
+curl -X POST http://localhost:3000/api/v1/agents/risk/evaluate \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
   -d '{"signalId":"SIGNAL_ID"}'
 
-curl http://localhost:3000/api/v1/agents/supervisor/decisions \
+# Decision supervisor
+curl -X POST http://localhost:3000/api/v1/agents/supervisor/decide \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"signalId":"SIGNAL_ID"}'
+
+# Paper trading
+curl http://localhost:3000/api/v1/paper-trading/trades?limit=200 \
   -H "Authorization: Bearer TOKEN"
 
-curl http://localhost:3000/api/v1/agents/supervisor/decisions/SUPERVISOR_DECISION_ID \
-  -H "Authorization: Bearer TOKEN"
+# Config del sistema
+curl -X PATCH http://localhost:3000/api/v1/system/config \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"ASSISTED_TRADING","killSwitch":false}'
+
+# MT5 dry-run desde una senal
+curl -X POST http://localhost:3000/api/v1/broker/mt5/orders/dry-run/from-signal \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"signalId":"SIGNAL_ID"}'
 ```
 
-Config global del sistema:
+## LIVE_LIMITED
 
-```bash
-curl http://localhost:3000/api/v1/system/config \
-  -H "Authorization: Bearer TOKEN"
+Por defecto esta apagado. Para habilitarlo en demo/controlado:
 
-curl -X PATCH http://localhost:3000/api/v1/system/config \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
-  -d '{"mode":"PAPER_TRADING","killSwitch":false}'
+```env
+ENABLE_LIVE_TRADING=true
+MT5_DRY_RUN=false
 ```
 
-Para bloquear todo el sistema:
+Luego cambiar modo:
 
 ```bash
 curl -X PATCH http://localhost:3000/api/v1/system/config \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
+  -d '{"mode":"LIVE_LIMITED","killSwitch":false}'
+```
+
+Configurar limites:
+
+```bash
+curl -X PATCH http://localhost:3000/api/v1/live-trading/limits \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"maxDailyLiveTrades":1,"maxDailyLoss":50,"maxVolumePerTrade":0.01,"allowedSymbols":["XAUUSD","BTCUSDT"],"isActive":true}'
+```
+
+Ejecutar:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/live-trading/signals/SIGNAL_ID/execute \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"manualDecisionId":"MANUAL_DECISION_ID","confirmationText":"CONFIRMO EJECUCION REAL LIMITADA"}'
+```
+
+Nunca activar con dinero real sin validar primero en demo, revisar logs y confirmar limites. El kill
+switch corta ejecucion:
+
+```bash
+curl -X PATCH http://localhost:3000/api/v1/system/config \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
   -d '{"killSwitch":true}'
 ```
 
-Con `killSwitch = true` el Supervisor responde `BLOCK` para toda senal. Con `mode = SAFE_MODE` o
-`mode = PAUSED` tampoco se abren trades.
+## Workers Python
 
-Para probar el flujo completo:
+Technical agent:
 
-1. Crear o sincronizar velas hasta disparar `SIGNAL_CREATED`.
-2. Verificar que el Risk Agent cree un `RiskAssessment`.
-3. Consultar `GET /agents/supervisor/decisions` y confirmar `OPERATE`, `WAIT` o `BLOCK`.
-4. Si fue `OPERATE`, consultar `GET /paper-trading/trades?signalId=SIGNAL_ID`.
+```bash
+cd services/agents
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+pytest
+```
+
+MT5 worker:
+
+```bash
+cd services/mt5-worker
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8010
+pytest
+```
+
+El paquete oficial `MetaTrader5` normalmente requiere Windows/VPS con terminal MT5 disponible. En
+macOS/Linux Docker el worker sirve para health, contratos y dry-run, pero no para conexion real al
+terminal.
+
+## Analytics
+
+Endpoints principales:
+
+```bash
+curl "http://localhost:3000/api/v1/analytics/summary?executionType=PAPER_TRADING" \
+  -H "Authorization: Bearer TOKEN"
+
+curl "http://localhost:3000/api/v1/analytics/equity-curve?executionType=BACKTEST" \
+  -H "Authorization: Bearer TOKEN"
+
+curl "http://localhost:3000/api/v1/analytics/export.csv?type=trades&executionType=PAPER_TRADING" \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Filtros soportados: `executionType`, `instrumentId`, `symbol`, `strategyId`, `timeframe`, `from`,
+`to`.
+
+## Tests
+
+```bash
+npm run build
+npm test
+npm test -- --coverage --runInBand
+```
+
+Workers Python:
+
+```bash
+python3 -m pytest services/agents/app/tests services/mt5-worker/app/tests
+```
+
+## Migraciones y Prisma
+
+```bash
+npm run prisma:migrate
+npm run prisma:deploy
+npm run prisma:generate
+npm run prisma:seed
+```
 
 ## Estructura
 
@@ -649,33 +367,30 @@ src/
   common/
   config/
   database/
+  events/
   health/
   queues/
-  shared/
   modules/
     auth/
     instruments/
     market-data/
+    agents/
+    fundamental/
     signals/
     strategies/
-    agents/
     risk/
     supervisor/
     system/
     paper-trading/
+    assisted-trading/
+    broker/
+    live-trading/
+    analytics/
+    realtime/
+services/
+  agents/
+  mt5-worker/
+prisma/
+  schema.prisma
+  migrations/
 ```
-
-Cada modulo de negocio separa:
-
-- `domain`: entidades, puertos/repositorios e interfaces.
-- `application`: casos de uso y servicios de aplicacion.
-- `infrastructure`: adaptadores concretos, por ahora Prisma.
-- `presentation`: controllers y DTOs HTTP.
-
-## Listo para Sprint 10
-
-- Definir politicas de portfolio sobre multiples instrumentos y cuentas.
-- Exponer metricas agregadas de cuenta/trades para dashboard.
-- Mostrar decisiones de Technical/Risk/Supervisor y razonamiento por senal.
-- Agregar controles visuales para `SystemConfig`, kill switch y estado de colas.
-- Preparar integracion sandbox con broker sin tocar ejecucion real todavia.

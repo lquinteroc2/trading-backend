@@ -7,6 +7,7 @@ export const QUEUE_NAMES = {
   RISK_EVALUATION: 'risk-evaluation-queue',
   SUPERVISOR_DECISION: 'supervisor-decision-queue',
   PAPER_TRADING: 'paper-trading-queue',
+  BROKER_EXECUTION: 'broker-execution-queue',
 } as const;
 
 export const QUEUE_JOBS = {
@@ -17,4 +18,5 @@ export const QUEUE_JOBS = {
   SUPERVISOR_DECIDE: 'supervisor.decide',
   PAPER_TRADE_OPEN: 'paper-trade.open',
   PAPER_TRADE_EVALUATE_OPEN_TRADES: 'paper-trade.evaluate-open-trades',
+  BROKER_MT5_DRY_RUN: 'broker.mt5.dry-run',
 } as const;

@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { SignalStatus, Timeframe } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class FindSignalsDto {
   @ApiPropertyOptional({ example: 'ID_DEL_INSTRUMENTO_BTCUSDT' })
@@ -27,4 +27,11 @@ export class FindSignalsDto {
   @IsOptional()
   @IsDateString()
   to?: string;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 500, default: 200 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  limit?: number;
 }

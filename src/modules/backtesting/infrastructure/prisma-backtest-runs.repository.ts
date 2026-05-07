@@ -31,6 +31,7 @@ export class PrismaBacktestRunsRepository implements BacktestRunsRepository {
       where: { id },
       data: {
         ...metrics,
+        filterReasons: metrics.filterReasons as Prisma.InputJsonValue,
         status: BacktestStatus.COMPLETED,
         finishedAt: new Date(),
       },
@@ -104,6 +105,10 @@ export class PrismaBacktestRunsRepository implements BacktestRunsRepository {
     netPnL: Prisma.Decimal;
     averageWin: Prisma.Decimal | null;
     averageLoss: Prisma.Decimal | null;
+    signalsBeforeFilters: number;
+    signalsAfterFilters: number;
+    filteredSignals: number;
+    filterReasons: Prisma.JsonValue | null;
     status: BacktestStatus;
     errorMessage: string | null;
     createdAt: Date;
@@ -130,6 +135,10 @@ export class PrismaBacktestRunsRepository implements BacktestRunsRepository {
       run.netPnL.toNumber(),
       run.averageWin?.toNumber() ?? null,
       run.averageLoss?.toNumber() ?? null,
+      run.signalsBeforeFilters,
+      run.signalsAfterFilters,
+      run.filteredSignals,
+      run.filterReasons,
       run.status,
       run.errorMessage,
       run.createdAt,

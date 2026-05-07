@@ -1,4 +1,11 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import {
   AgentDecisionAction,
   AgentType,
@@ -12,6 +19,8 @@ import {
 } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/database/prisma.service';
+import { InternalEventBus } from '@/events/internal-event-bus.service';
+import { TRADING_EVENTS } from '@/events/trading-events';
 import { MarketCandleEntity } from '@/modules/market-data/domain/market-candle.entity';
 import { SignalsService } from '@/modules/signals/application/signals.service';
 import { TOKENS } from '@/shared/tokens';
@@ -36,6 +45,8 @@ export class PaperTradingEngineService {
     private readonly paperTradesRepository: PaperTradesRepository,
     @Inject(TOKENS.PAPER_TRADING_ACCOUNTS_REPOSITORY)
     private readonly accountsRepository: PaperTradingAccountsRepository,
+    @Optional()
+    private readonly eventBus?: InternalEventBus,
   ) {}
 
   createAccount(data: { name: string; initialBalance: number; currency?: string }) {
@@ -75,7 +86,11 @@ export class PaperTradingEngineService {
     }
 
     const signal = await this.signalsService.findById(signalId);
-    if (signal.status !== SignalStatus.APPROVED && signal.status !== SignalStatus.UNDER_REVIEW) {
+    if (
+      signal.status !== SignalStatus.APPROVED &&
+      signal.status !== SignalStatus.UNDER_REVIEW &&
+      signal.status !== SignalStatus.MANUALLY_APPROVED
+    ) {
       throw new BadRequestException('Signal is not approved by risk');
     }
     if (signal.direction !== SignalDirection.BUY && signal.direction !== SignalDirection.SELL) {
@@ -151,6 +166,14 @@ export class PaperTradingEngineService {
     );
 
     await this.recalculateAccountEquity(account.id);
+    if (typeof this.signalsService.updateStatus === 'function') {
+      await this.signalsService.updateStatus(signal.id, SignalStatus.EXECUTED_PAPER);
+    }
+    this.eventBus?.emit(TRADING_EVENTS.PAPER_TRADE_OPENED, {
+      signalId: signal.id,
+      tradeId: trade.id,
+      instrumentId: signal.instrumentId,
+    });
     return trade;
   }
 
@@ -202,6 +225,12 @@ export class PaperTradingEngineService {
         balanceAfter,
       }),
     );
+
+    this.eventBus?.emit(TRADING_EVENTS.PAPER_TRADE_CLOSED, {
+      tradeId: trade.id,
+      result,
+      pnl,
+    });
 
     return closedTrade;
   }
