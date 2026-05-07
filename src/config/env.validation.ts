@@ -33,6 +33,40 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  JWT_ACCESS_EXPIRES_IN?: string;
+
+  @IsOptional()
+  @IsString()
+  JWT_REFRESH_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  JWT_REFRESH_EXPIRES_IN?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  JWT_ACCESS_COOKIE_MAX_AGE_MS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  JWT_REFRESH_COOKIE_MAX_AGE_MS?: number;
+
+  @IsOptional()
+  @IsString()
+  CORS_ORIGINS?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  COOKIE_SECURE?: boolean;
+
+  @IsOptional()
+  @IsString()
+  COOKIE_SAME_SITE?: string;
+
+  @IsOptional()
+  @IsString()
   REDIS_HOST?: string;
 
   @IsOptional()
@@ -97,6 +131,31 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsInt()
+  @Min(1)
+  TECHNICAL_SR_LOOKBACK?: number;
+
+  @IsOptional()
+  @Min(0)
+  TECHNICAL_SR_TOLERANCE_PERCENT?: number;
+
+  @IsOptional()
+  @Min(0)
+  TECHNICAL_LOW_VOL_ATR_PERCENT?: number;
+
+  @IsOptional()
+  @Min(0)
+  TECHNICAL_HIGH_VOL_ATR_PERCENT?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  TECHNICAL_ENABLE_MULTI_TIMEFRAME?: boolean;
+
+  @IsOptional()
+  @IsString()
+  TECHNICAL_CONFIRMATION_TIMEFRAMES?: string;
+
+  @IsOptional()
+  @IsInt()
   @Min(0)
   SIGNAL_MIN_CONFIDENCE?: number;
 
@@ -112,6 +171,14 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   SIGNAL_GENERATION_QUEUE_CONCURRENCY?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  SIGNAL_BLOCK_RANGING_MARKET?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  SIGNAL_BLOCK_MTF_CONFLICT?: boolean;
 
   @IsOptional()
   @Min(0)
@@ -149,6 +216,43 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   SUPERVISOR_DECISION_QUEUE_CONCURRENCY?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  ENABLE_LIVE_TRADING?: boolean;
+
+  @IsOptional()
+  @IsString()
+  BROKER_PROVIDER?: string;
+
+  @IsOptional()
+  @IsString()
+  MT5_WORKER_BASE_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  MT5_LOGIN?: string;
+
+  @IsOptional()
+  @IsString()
+  MT5_PASSWORD?: string;
+
+  @IsOptional()
+  @IsString()
+  MT5_SERVER?: string;
+
+  @IsOptional()
+  @IsString()
+  MT5_TERMINAL_PATH?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  MT5_DRY_RUN?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  MT5_REQUEST_TIMEOUT_MS?: number;
 }
 
 export function validateConfig(config: Record<string, unknown>) {

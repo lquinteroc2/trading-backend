@@ -74,8 +74,9 @@ API_BASE_URL=http://localhost:3000/api/v1
 Recomendacion:
 
 - Usa `API_BASE_URL` en Server Components, Server Actions y Route Handlers.
-- Evita llamar al backend directamente desde el browser al inicio, porque el backend no tiene CORS habilitado todavia.
-- Si necesitas llamadas client-side directas, agrega CORS en Nest o crea proxy endpoints en Next.
+- Para web, se recomienda el patron BFF/proxy de Next: el browser habla con Next y Next reenvia al backend.
+- El backend tambien soporta llamadas directas desde browser con cookies `HttpOnly` y CORS con credentials para origins confiables.
+- Configura `CORS_ORIGINS` con los frontends permitidos, por ejemplo `http://localhost:3001`.
 
 Ejemplo de cliente API para Next:
 
@@ -123,6 +124,26 @@ Content-Type: application/json
 
 Respuesta esperada: token JWT y datos basicos del usuario.
 
+El backend tambien setea cookies:
+
+- `trading_access_token`: cookie `HttpOnly` para requests autenticados.
+- `trading_refresh_token`: cookie `HttpOnly` limitada a `/api/v1/auth/refresh`.
+
+El `refreshToken` no se devuelve en el body; solo via cookie `HttpOnly`. En base de datos se guarda hasheado y se rota en cada refresh, dejando revocado el token anterior.
+
+Refresh de sesion:
+
+```http
+POST /auth/refresh
+Cookie: trading_refresh_token=<refresh-token-cookie>
+```
+
+Logout:
+
+```http
+POST /auth/logout
+```
+
 Usuario actual:
 
 ```http
@@ -130,7 +151,7 @@ GET /auth/me
 Authorization: Bearer <token>
 ```
 
-Nota de seguridad: hoy solo `GET /auth/me` esta protegido con guard JWT. El frontend deberia quedar preparado para enviar `Authorization: Bearer <token>` en todos los endpoints privados, porque lo natural es cerrar el API completo antes de produccion.
+Tambien puedes autenticar `GET /auth/me` con cookie `trading_access_token`. Se mantiene `Authorization: Bearer <token>` para compatibilidad con BFF, Swagger, Postman y clientes mobile.
 
 ## Enums Utiles
 

@@ -68,6 +68,9 @@ export class RunBacktestUseCase {
         timeframe: input.timeframe,
         initialBalance: input.initialBalance,
         riskPercent: input.riskPercent,
+        useSupportResistanceFilter: input.useSupportResistanceFilter,
+        useMarketRegimeFilter: input.useMarketRegimeFilter,
+        useMultiTimeframeConfirmation: input.useMultiTimeframeConfirmation,
         candles,
       });
 
@@ -90,6 +93,10 @@ export class RunBacktestUseCase {
           averageWin: completedRun.averageWin,
           averageLoss: completedRun.averageLoss,
           finalBalance: completedRun.finalBalance,
+          signalsBeforeFilters: completedRun.signalsBeforeFilters,
+          signalsAfterFilters: completedRun.signalsAfterFilters,
+          filteredSignals: completedRun.filteredSignals,
+          filterReasons: completedRun.filterReasons,
         },
       };
     } catch (error) {

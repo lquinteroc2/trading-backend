@@ -9,9 +9,14 @@ export class InternalEventBus {
     this.emitter.emit(eventName, payload);
   }
 
-  on<TPayload>(eventName: string, listener: (payload: TPayload) => void | Promise<void>): void {
-    this.emitter.on(eventName, (payload: TPayload) => {
+  on<TPayload>(
+    eventName: string,
+    listener: (payload: TPayload) => void | Promise<void>,
+  ): () => void {
+    const wrapped = (payload: TPayload) => {
       void listener(payload);
-    });
+    };
+    this.emitter.on(eventName, wrapped);
+    return () => this.emitter.off(eventName, wrapped);
   }
 }

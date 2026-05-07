@@ -25,6 +25,10 @@ export type BacktestMetricsData = {
   netPnL: number;
   averageWin: number | null;
   averageLoss: number | null;
+  signalsBeforeFilters?: number;
+  signalsAfterFilters?: number;
+  filteredSignals?: number;
+  filterReasons?: Record<string, number>;
 };
 
 export type CreateBacktestTradeData = {

@@ -14,7 +14,9 @@ import {
 
 export type TechnicalAnalyzeParams = {
   instrumentId: string;
-  timeframe: Timeframe;
+  timeframe?: Timeframe;
+  primaryTimeframe?: Timeframe;
+  confirmationTimeframes?: Timeframe[];
   limit?: number;
   executionSource?: AgentExecutionSource;
 };
@@ -43,6 +45,11 @@ export class TechnicalAnalyzeUseCase {
     const minCandles = this.config.get<number>('technicalAgent.minCandles') ?? 200;
     const defaultLimit = this.config.get<number>('technicalAgent.defaultLimit') ?? 1000;
     const limit = params.limit ?? defaultLimit;
+    const primaryTimeframe = params.primaryTimeframe ?? params.timeframe;
+
+    if (!primaryTimeframe) {
+      throw new BadRequestException('timeframe or primaryTimeframe is required');
+    }
 
     if (limit < minCandles) {
       throw new BadRequestException(`At least ${minCandles} candles are required`);
@@ -58,7 +65,7 @@ export class TechnicalAnalyzeUseCase {
 
     const candles = await this.candlesRepository.findMany({
       instrumentId: params.instrumentId,
-      timeframe: params.timeframe,
+      timeframe: primaryTimeframe,
       limit,
       order: 'desc',
     });
@@ -71,9 +78,31 @@ export class TechnicalAnalyzeUseCase {
     const orderedCandles = [...candles].sort(
       (left, right) => left.timestamp.getTime() - right.timestamp.getTime(),
     );
+    const confirmationTimeframes = this.resolveConfirmationTimeframes(
+      primaryTimeframe,
+      params.confirmationTimeframes,
+    );
+    const candlesByTimeframe: Partial<Record<Timeframe, typeof orderedCandles>> = {
+      [primaryTimeframe]: orderedCandles,
+    };
+    for (const timeframe of confirmationTimeframes) {
+      const confirmationCandles = await this.candlesRepository.findMany({
+        instrumentId: params.instrumentId,
+        timeframe,
+        limit,
+        order: 'desc',
+      });
+      if (confirmationCandles.length >= minCandles) {
+        candlesByTimeframe[timeframe] = [...confirmationCandles].sort(
+          (left, right) => left.timestamp.getTime() - right.timestamp.getTime(),
+        );
+      }
+    }
+
     const result = await this.technicalAnalysisProvider.analyzeCandles({
       symbol: instrument.symbol,
-      timeframe: params.timeframe,
+      timeframe: primaryTimeframe,
+      primaryTimeframe,
       candles: orderedCandles.map((candle) => ({
         timestamp: candle.timestamp,
         open: candle.open,
@@ -82,6 +111,19 @@ export class TechnicalAnalyzeUseCase {
         close: candle.close,
         volume: candle.volume,
       })),
+      timeframes: Object.fromEntries(
+        Object.entries(candlesByTimeframe).map(([timeframe, timeframeCandles]) => [
+          timeframe,
+          (timeframeCandles ?? []).map((candle) => ({
+            timestamp: candle.timestamp,
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+            volume: candle.volume,
+          })),
+        ]),
+      ),
     });
 
     const decisionAction = this.toDecisionAction(result);
@@ -95,10 +137,15 @@ export class TechnicalAnalyzeUseCase {
       metadata: {
         symbol: result.symbol,
         timeframe: result.timeframe,
+        primaryTimeframe: result.primaryTimeframe ?? primaryTimeframe,
+        confirmationTimeframes,
         candlesAnalyzed: result.candlesAnalyzed,
         trend: result.trend,
         technicalBias: result.technicalBias,
         indicators: result.indicators,
+        supportResistance: result.supportResistance,
+        marketRegime: result.marketRegime,
+        multiTimeframe: result.multiTimeframe,
         rawResponse: result,
         warnings: result.warnings,
       },
@@ -107,7 +154,7 @@ export class TechnicalAnalyzeUseCase {
     this.eventBus?.emit(TRADING_EVENTS.TECHNICAL_ANALYSIS_COMPLETED, {
       agentDecisionId: decision.id,
       instrumentId: params.instrumentId,
-      timeframe: params.timeframe,
+      timeframe: primaryTimeframe,
       symbol: instrument.symbol,
     });
 
@@ -126,5 +173,21 @@ export class TechnicalAnalyzeUseCase {
       return AgentDecisionAction.WAIT;
     }
     return AgentDecisionAction.REJECT;
+  }
+
+  private resolveConfirmationTimeframes(
+    primaryTimeframe: Timeframe,
+    requested?: Timeframe[],
+  ): Timeframe[] {
+    const enabled = this.config.get<boolean>('technicalAgent.enableMultiTimeframe') ?? true;
+    if (!enabled) {
+      return [];
+    }
+    const configured = this.config.get<Timeframe[]>('technicalAgent.confirmationTimeframes') ?? [
+      Timeframe.H1,
+      Timeframe.H4,
+    ];
+    const candidates = requested ?? configured;
+    return [...new Set(candidates)].filter((timeframe) => timeframe !== primaryTimeframe);
   }
 }

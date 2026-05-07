@@ -78,6 +78,9 @@ function makeService() {
     paperTrade: {
       findMany: jest.fn(async () => []),
     },
+    instrument: {
+      findUnique: jest.fn(async () => ({ id: signal.instrumentId, symbol: 'BTCUSDT' })),
+    },
   };
   const signalsService = {
     findById: jest.fn(async () => signal),
@@ -89,14 +92,26 @@ function makeService() {
   const config = {
     get: jest.fn((key: string, fallback?: unknown) => fallback),
   };
+  const fundamentalAgent = {
+    evaluate: jest.fn(async () => ({
+      decision: 'ALLOW',
+      currency: 'USD',
+      windowBeforeMinutes: 15,
+      windowAfterMinutes: 15,
+      blockingEvent: null,
+      reason: 'No hay eventos de alto impacto dentro de la ventana de bloqueo.',
+      createdAt: new Date('2026-05-01T00:00:00.000Z'),
+    })),
+  };
 
   const service = new SupervisorAgentService(
     prisma as never,
     signalsService as never,
     systemConfigService as never,
     config as never,
+    fundamentalAgent as never,
   );
-  return { service, prisma, signalsService, systemConfigService };
+  return { service, prisma, signalsService, systemConfigService, fundamentalAgent };
 }
 
 describe('SupervisorAgentService', () => {
@@ -177,6 +192,37 @@ describe('SupervisorAgentService', () => {
       }),
     );
     expect(prisma.agentDecision.create).toHaveBeenCalled();
+    expect(prisma.agentDecision.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          agentType: 'FUNDAMENTAL',
+          decision: 'APPROVE',
+        }),
+      }),
+    );
     expect(signalsService.updateStatus).toHaveBeenCalledWith(signal.id, SignalStatus.APPROVED);
+  });
+
+  it('blocks when fundamental agent blocks the signal', () => {
+    const { service } = makeService();
+
+    const result = service.decide(signal, riskDecision, accountState, systemConfig, {
+      decision: 'BLOCK',
+      currency: 'USD',
+      windowBeforeMinutes: 15,
+      windowAfterMinutes: 15,
+      blockingEvent: {
+        id: 'economic-event-1',
+        currency: 'USD',
+        title: 'FOMC Interest Rate Decision',
+        impact: 'HIGH',
+        eventTime: new Date('2026-05-05T18:00:00.000Z'),
+      },
+      reason: 'Evento económico de alto impacto dentro de la ventana de bloqueo.',
+      createdAt: new Date('2026-05-05T17:50:00.000Z'),
+    });
+
+    expect(result.decision).toBe(SupervisorDecisionAction.BLOCK);
+    expect(result.reason).toContain('Fundamental decision is BLOCK');
   });
 });

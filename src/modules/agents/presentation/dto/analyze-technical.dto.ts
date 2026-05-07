@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Timeframe } from '@prisma/client';
-import { IsEnum, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
+import { IsArray, IsEnum, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
 
 export class AnalyzeTechnicalDto {
   @ApiProperty({
@@ -11,8 +11,20 @@ export class AnalyzeTechnicalDto {
   instrumentId!: string;
 
   @ApiProperty({ enum: Timeframe, example: Timeframe.M15 })
+  @IsOptional()
   @IsEnum(Timeframe)
-  timeframe!: Timeframe;
+  timeframe?: Timeframe;
+
+  @ApiPropertyOptional({ enum: Timeframe, example: Timeframe.M15 })
+  @IsOptional()
+  @IsEnum(Timeframe)
+  primaryTimeframe?: Timeframe;
+
+  @ApiPropertyOptional({ enum: Timeframe, isArray: true, example: [Timeframe.H1, Timeframe.H4] })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(Timeframe, { each: true })
+  confirmationTimeframes?: Timeframe[];
 
   @ApiPropertyOptional({ minimum: 200, example: 1000 })
   @IsOptional()

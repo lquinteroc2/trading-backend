@@ -8,8 +8,20 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+  const corsOrigins = config.get<string[]>('security.corsOrigins') ?? [];
 
   app.setGlobalPrefix('api/v1');
+  app.enableCors({
+    credentials: true,
+    origin(origin, callback) {
+      if (!origin || corsOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`CORS origin not allowed: ${origin}`), false);
+    },
+  });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
