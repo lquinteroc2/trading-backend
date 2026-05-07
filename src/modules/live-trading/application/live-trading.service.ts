@@ -33,9 +33,12 @@ export class LiveTradingService {
       payload: { manualDecisionId },
     });
 
-    let context;
+    let liveTradeId!: string;
+    let orderRequest!: BrokerOrderRequest;
     try {
-      context = await this.guard.validateLiveExecution(signalId, userId, manualDecisionId);
+      const reserved = await this.reserveLiveExecution(signalId, userId, manualDecisionId);
+      liveTradeId = reserved.liveTradeId;
+      orderRequest = reserved.orderRequest;
       await this.log({
         signalId,
         userId,
@@ -63,16 +66,6 @@ export class LiveTradingService {
       throw error;
     }
 
-    const orderRequest: BrokerOrderRequest = {
-      symbol: context.symbol,
-      direction: context.signal.direction as 'BUY' | 'SELL',
-      volume: context.volume,
-      entryPrice: context.signal.entryPrice.toNumber(),
-      stopLoss: context.signal.stopLoss?.toNumber(),
-      takeProfit: context.signal.takeProfit?.toNumber(),
-      comment: 'INVERSIONES_LIVE_LIMITED',
-    };
-
     await this.log({
       signalId,
       userId,
@@ -96,12 +89,7 @@ export class LiveTradingService {
         throw new BadRequestException('Broker did not execute limited live order');
       }
 
-      const liveTrade = await this.createLiveTrade(
-        signalId,
-        orderRequest,
-        brokerResponse,
-        context.manualDecision.id,
-      );
+      const liveTrade = await this.markLiveTradeExecuted(liveTradeId, brokerResponse);
       await this.prisma.tradingSignal.update({
         where: { id: signalId },
         data: { status: SignalStatus.LIVE_EXECUTED },
@@ -133,23 +121,7 @@ export class LiveTradingService {
         reason,
         payload: orderRequest,
       });
-      await this.prisma.liveTrade.create({
-        data: {
-          signalId,
-          manualDecisionId: context.manualDecision.id,
-          brokerProvider: 'MT5',
-          symbol: orderRequest.symbol,
-          direction: orderRequest.direction,
-          volume: orderRequest.volume,
-          entryPrice: orderRequest.entryPrice,
-          stopLoss: orderRequest.stopLoss,
-          takeProfit: orderRequest.takeProfit,
-          status: LiveTradeStatus.FAILED,
-          requestPayload: orderRequest as Prisma.InputJsonObject,
-          responsePayload: undefined,
-          errorMessage: reason,
-        },
-      });
+      await this.markLiveTradeFailed(liveTradeId, reason);
       this.eventBus?.emit(TRADING_EVENTS.LIVE_EXECUTION_FAILED, {
         signalId,
         userId,
@@ -224,29 +196,76 @@ export class LiveTradingService {
     });
   }
 
-  private createLiveTrade(
+  private async reserveLiveExecution(
     signalId: string,
-    request: BrokerOrderRequest,
-    response: BrokerLiveOrderResponse,
+    userId: string,
     manualDecisionId: string,
   ) {
-    return this.prisma.liveTrade.create({
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const context = await this.guard.validateLiveExecution(
+            signalId,
+            userId,
+            manualDecisionId,
+            tx,
+          );
+          const orderRequest: BrokerOrderRequest = {
+            symbol: context.symbol,
+            direction: context.signal.direction as 'BUY' | 'SELL',
+            volume: context.volume,
+            entryPrice: context.signal.entryPrice.toNumber(),
+            stopLoss: context.signal.stopLoss?.toNumber(),
+            takeProfit: context.signal.takeProfit?.toNumber(),
+            comment: 'INVERSIONES_LIVE_LIMITED',
+          };
+          const liveTrade = await tx.liveTrade.create({
+            data: {
+              signalId,
+              manualDecisionId: context.manualDecision.id,
+              brokerProvider: 'MT5',
+              symbol: orderRequest.symbol,
+              direction: orderRequest.direction,
+              volume: orderRequest.volume,
+              entryPrice: orderRequest.entryPrice,
+              stopLoss: orderRequest.stopLoss,
+              takeProfit: orderRequest.takeProfit,
+              status: LiveTradeStatus.REQUESTED,
+              requestPayload: orderRequest as Prisma.InputJsonObject,
+            },
+          });
+
+          return { context, liveTradeId: liveTrade.id, orderRequest };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+        throw new BadRequestException('Live execution is already in progress for this signal');
+      }
+      throw error;
+    }
+  }
+
+  private markLiveTradeExecuted(id: string, response: BrokerLiveOrderResponse) {
+    return this.prisma.liveTrade.update({
+      where: { id },
       data: {
-        signalId,
-        manualDecisionId,
-        brokerProvider: 'MT5',
         brokerOrderId: response.brokerOrderId,
-        symbol: request.symbol,
-        direction: request.direction,
-        volume: request.volume,
-        entryPrice: request.entryPrice,
-        stopLoss: request.stopLoss,
-        takeProfit: request.takeProfit,
         status: response.executed ? LiveTradeStatus.EXECUTED : LiveTradeStatus.REJECTED,
-        requestPayload: request as Prisma.InputJsonObject,
         responsePayload: response as unknown as Prisma.InputJsonObject,
         errorMessage: response.executed ? undefined : 'Broker did not execute order',
         openedAt: response.executed ? new Date(response.timestamp) : undefined,
+      },
+    });
+  }
+
+  private markLiveTradeFailed(id: string, reason: string) {
+    return this.prisma.liveTrade.update({
+      where: { id },
+      data: {
+        status: LiveTradeStatus.FAILED,
+        errorMessage: reason,
       },
     });
   }

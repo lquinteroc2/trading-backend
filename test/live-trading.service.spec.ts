@@ -49,7 +49,7 @@ function makePrisma(
           : SupervisorDecisionAction.OPERATE,
     },
   };
-  const prisma = {
+  const prisma: Record<string, any> = {
     user: {
       findUnique: jest.fn(async () => ({
         id: 'user-1',
@@ -103,6 +103,7 @@ function makePrisma(
         ),
       count: jest.fn(async () => overrides.dailyTrades ?? 0),
       create: jest.fn(async (input) => ({ id: 'live-trade-1', ...input.data })),
+      update: jest.fn(async (input) => ({ id: input.where.id, ...input.data })),
       findMany: jest.fn(async () => []),
       findUnique: jest.fn(async () => ({ id: 'live-trade-1' })),
     },
@@ -111,6 +112,12 @@ function makePrisma(
       findMany: jest.fn(async () => []),
     },
   };
+  prisma.$transaction = jest.fn(async (input: unknown) => {
+    if (typeof input === 'function') {
+      return input(prisma);
+    }
+    return Promise.all(input as Promise<unknown>[]);
+  });
   const config = {
     get: jest.fn((key: string) => {
       if (key === 'broker.enableLiveTrading') return overrides.enableLiveTrading ?? true;
@@ -243,6 +250,12 @@ describe('LiveTradingService', () => {
       data: expect.objectContaining({
         signalId: 'signal-1',
         manualDecisionId: 'manual-decision-1',
+        status: LiveTradeStatus.REQUESTED,
+      }),
+    });
+    expect(prisma.liveTrade.update).toHaveBeenCalledWith({
+      where: { id: 'live-trade-1' },
+      data: expect.objectContaining({
         brokerOrderId: '123456',
         status: LiveTradeStatus.EXECUTED,
       }),

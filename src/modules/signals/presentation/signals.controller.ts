@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
+import { Roles } from '@/modules/auth/presentation/decorators/roles.decorator';
 import { SignalsService } from '../application/signals.service';
 import { CreateSignalDto } from './dto/create-signal.dto';
 import { FindSignalsDto } from './dto/find-signals.dto';
@@ -11,6 +13,7 @@ export class SignalsController {
   constructor(private readonly signalsService: SignalsService) {}
 
   @Post()
+  @Roles(Role.ADMIN, Role.TRADER)
   create(@Body() dto: CreateSignalDto) {
     return this.signalsService.create({
       ...dto,
@@ -19,6 +22,7 @@ export class SignalsController {
   }
 
   @Get()
+  @Roles(Role.ADMIN, Role.TRADER, Role.VIEWER)
   findMany(@Query() query: FindSignalsDto) {
     return this.signalsService.findMany({
       ...query,
@@ -28,11 +32,13 @@ export class SignalsController {
   }
 
   @Get(':id')
+  @Roles(Role.ADMIN, Role.TRADER, Role.VIEWER)
   findOne(@Param('id') id: string) {
     return this.signalsService.findById(id);
   }
 
   @Patch(':id/status')
+  @Roles(Role.ADMIN, Role.TRADER)
   updateStatus(@Param('id') id: string, @Body() dto: UpdateSignalStatusDto) {
     return this.signalsService.updateStatus(id, dto.status);
   }

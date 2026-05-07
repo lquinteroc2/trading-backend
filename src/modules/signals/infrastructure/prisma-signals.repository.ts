@@ -36,6 +36,7 @@ export class PrismaSignalsRepository implements TradingSignalsRepository {
         },
       },
       orderBy: { createdAt: 'desc' },
+      take: query.limit ?? 200,
     });
     return signals.map((signal) => this.toEntity(signal));
   }

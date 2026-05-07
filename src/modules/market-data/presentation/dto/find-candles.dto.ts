@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Timeframe } from '@prisma/client';
-import { IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class FindCandlesDto {
   @ApiPropertyOptional({
@@ -26,10 +26,11 @@ export class FindCandlesDto {
   @IsDateString()
   to?: string;
 
-  @ApiPropertyOptional({ minimum: 1, example: 5 })
+  @ApiPropertyOptional({ minimum: 1, maximum: 5000, default: 1000, example: 500 })
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Max(5000)
   limit?: number;
 
   @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'asc', example: 'desc' })

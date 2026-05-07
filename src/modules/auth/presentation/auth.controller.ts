@@ -6,6 +6,7 @@ import { AuthService } from '../application/auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { Public } from './decorators/public.decorator';
 import { JwtUser } from './types/jwt-user.type';
 import { clearAuthCookies, REFRESH_TOKEN_COOKIE, setAuthCookies } from './auth-cookies';
 import { readCookie } from './cookie-parser';
@@ -19,6 +20,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @Public()
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) response: Response) {
     const session = await this.authService.login(dto.email, dto.password);
     setAuthCookies(response, session, this.cookieConfig());
@@ -26,6 +28,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Public()
   async refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const refreshToken = readCookie(request.headers.cookie, REFRESH_TOKEN_COOKIE);
     if (!refreshToken) {
@@ -39,6 +42,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @Public()
   async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     await this.authService.logout(readCookie(request.headers.cookie, REFRESH_TOKEN_COOKIE));
     clearAuthCookies(response, this.cookieConfig());

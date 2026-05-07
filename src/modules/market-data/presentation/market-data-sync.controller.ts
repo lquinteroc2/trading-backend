@@ -1,7 +1,9 @@
 import { Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
 import { Queue } from 'bullmq';
+import { Roles } from '@/modules/auth/presentation/decorators/roles.decorator';
 import { QUEUE_JOBS, QUEUE_NAMES } from '@/queues/queue.constants';
 import { MarketDataService } from '../application/market-data.service';
 import { SyncHistoricalCandlesUseCase } from '../application/sync-historical-candles.use-case';
@@ -19,12 +21,14 @@ export class MarketDataSyncController {
   ) {}
 
   @Post('sync')
+  @Roles(Role.ADMIN, Role.TRADER)
   @ApiCreatedResponse({ description: 'Historical candles synchronized directly.' })
   sync(@Body() dto: SyncHistoricalCandlesDto) {
     return this.syncHistoricalCandles.execute(this.toUseCaseInput(dto));
   }
 
   @Post('sync/enqueue')
+  @Roles(Role.ADMIN, Role.TRADER)
   @ApiCreatedResponse({ description: 'Historical candle sync job queued.' })
   async enqueue(@Body() dto: SyncHistoricalCandlesDto) {
     const pendingSync = await this.syncHistoricalCandles.enqueue(this.toUseCaseInput(dto));
@@ -44,6 +48,7 @@ export class MarketDataSyncController {
   }
 
   @Get('sync-jobs')
+  @Roles(Role.ADMIN, Role.TRADER, Role.VIEWER)
   @ApiOkResponse({ description: 'Historical market data sync jobs.' })
   findSyncJobs(@Query() query: FindSyncJobsDto) {
     return this.marketDataService.findSyncJobs({
@@ -57,6 +62,7 @@ export class MarketDataSyncController {
   }
 
   @Get('sync-jobs/:id')
+  @Roles(Role.ADMIN, Role.TRADER, Role.VIEWER)
   @ApiOkResponse({ description: 'Historical market data sync job by id.' })
   async findSyncJobById(@Param('id') id: string) {
     const syncJob = await this.marketDataService.findSyncJobById(id);

@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { BacktestStatus } from '@prisma/client';
-import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class FindBacktestsDto {
   @ApiPropertyOptional()
@@ -22,5 +22,6 @@ export class FindBacktestsDto {
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Max(500)
   limit?: number;
 }

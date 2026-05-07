@@ -34,6 +34,7 @@ export type FindPaperTradesQuery = {
   result?: PaperTradeResult;
   from?: Date;
   to?: Date;
+  limit?: number;
 };
 
 export interface PaperTradesRepository {

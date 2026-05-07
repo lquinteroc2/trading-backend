@@ -1,6 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
 import { PrismaService } from '@/database/prisma.service';
+import { Roles } from '@/modules/auth/presentation/decorators/roles.decorator';
 
 @ApiTags('agent-decisions')
 @Controller('agent-decisions')
@@ -8,6 +10,7 @@ export class AgentDecisionsDashboardController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
+  @Roles(Role.ADMIN, Role.TRADER, Role.VIEWER)
   async findMany() {
     const decisions = await this.prisma.agentDecision.findMany({
       orderBy: { createdAt: 'desc' },

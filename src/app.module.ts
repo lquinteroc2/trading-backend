@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './modules/auth/presentation/guards/jwt-auth.guard';
+import { RolesGuard } from './modules/auth/presentation/guards/roles.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { InstrumentsModule } from './modules/instruments/instruments.module';
 import { MarketDataModule } from './modules/market-data/market-data.module';
@@ -62,6 +65,10 @@ import { validateConfig } from './config/env.validation';
     AssistedTradingModule,
     LiveTradingModule,
     AnalyticsModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
 export class AppModule {}

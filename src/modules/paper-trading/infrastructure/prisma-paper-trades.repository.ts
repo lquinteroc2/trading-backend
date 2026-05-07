@@ -36,6 +36,7 @@ export class PrismaPaperTradesRepository implements PaperTradesRepository {
         },
       },
       orderBy: { openedAt: 'desc' },
+      take: query.limit ?? 200,
     });
     return trades.map((trade) => this.toEntity(trade));
   }

@@ -38,6 +38,7 @@ export class LiveTradingGuardService {
     signalId: string,
     userId: string,
     manualDecisionId?: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
   ): Promise<LiveExecutionContext> {
     const enableLiveTrading = this.config.get<boolean>('broker.enableLiveTrading') ?? false;
     if (!enableLiveTrading) {
@@ -57,7 +58,7 @@ export class LiveTradingGuardService {
       throw new ForbiddenException('SystemMode must be LIVE_LIMITED');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await db.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -65,7 +66,7 @@ export class LiveTradingGuardService {
       throw new ForbiddenException('Only ADMIN can execute limited live trades');
     }
 
-    const signal = await this.prisma.tradingSignal.findUnique({
+    const signal = await db.tradingSignal.findUnique({
       where: { id: signalId },
       include: { instrument: true, supervisorDecision: true },
     });
@@ -82,7 +83,7 @@ export class LiveTradingGuardService {
       throw new ForbiddenException('Signal requires stopLoss and takeProfit');
     }
 
-    const riskAssessment = await this.prisma.riskAssessment.findFirst({
+    const riskAssessment = await db.riskAssessment.findFirst({
       where: { signalId, decision: RiskAssessmentDecision.APPROVED },
       orderBy: { createdAt: 'desc' },
     });
@@ -94,7 +95,7 @@ export class LiveTradingGuardService {
       throw new ForbiddenException('Signal has no SupervisorDecision OPERATE');
     }
 
-    const manualDecision = await this.prisma.manualTradingDecision.findFirst({
+    const manualDecision = await db.manualTradingDecision.findFirst({
       where: {
         id: manualDecisionId,
         signalId,
@@ -106,15 +107,15 @@ export class LiveTradingGuardService {
       throw new ForbiddenException('Signal has no manual approval');
     }
 
-    const existingLiveTrade = await this.prisma.liveTrade.findFirst({
-      where: { signalId },
+    const existingLiveTrade = await db.liveTrade.findFirst({
+      where: { signalId, status: { in: [LiveTradeStatus.REQUESTED, LiveTradeStatus.EXECUTED] } },
       orderBy: { createdAt: 'desc' },
     });
     if (existingLiveTrade) {
       throw new ForbiddenException('Signal already has a live trade');
     }
 
-    const limits = await this.getLimits();
+    const limits = await this.getLimits(db);
     if (!limits.isActive) {
       throw new ForbiddenException('Live trading limits are inactive');
     }
@@ -130,7 +131,7 @@ export class LiveTradingGuardService {
       throw new ForbiddenException('Volume exceeds maxVolumePerTrade');
     }
 
-    const openSameSymbol = await this.prisma.liveTrade.findFirst({
+    const openSameSymbol = await db.liveTrade.findFirst({
       where: {
         symbol,
         status: { in: [LiveTradeStatus.REQUESTED, LiveTradeStatus.EXECUTED] },
@@ -142,7 +143,7 @@ export class LiveTradingGuardService {
 
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
-    const dailyLiveTrades = await this.prisma.liveTrade.count({
+    const dailyLiveTrades = await db.liveTrade.count({
       where: {
         createdAt: { gte: dayStart },
         status: { in: [LiveTradeStatus.REQUESTED, LiveTradeStatus.EXECUTED] },
@@ -152,7 +153,7 @@ export class LiveTradingGuardService {
       throw new ForbiddenException('Daily live trade limit reached');
     }
 
-    const dailyLoss = 0;
+    const dailyLoss = await this.getDailyLoss(dayStart, db);
     if (dailyLoss >= limits.maxDailyLoss.toNumber()) {
       throw new ForbiddenException('Daily live loss limit reached');
     }
@@ -160,8 +161,8 @@ export class LiveTradingGuardService {
     return { signal, user, riskAssessment, manualDecision, limits, symbol, volume };
   }
 
-  async getLimits() {
-    return this.prisma.liveTradingLimits.upsert({
+  async getLimits(db: Prisma.TransactionClient | PrismaService = this.prisma) {
+    return db.liveTradingLimits.upsert({
       where: { id: LIVE_LIMITS_ID },
       update: {},
       create: {
@@ -177,5 +178,35 @@ export class LiveTradingGuardService {
 
   private readAllowedSymbols(value: Prisma.JsonValue): string[] {
     return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+  }
+
+  private async getDailyLoss(
+    dayStart: Date,
+    db: Prisma.TransactionClient | PrismaService,
+  ): Promise<number> {
+    const closedTrades = await db.liveTrade.findMany({
+      where: {
+        createdAt: { gte: dayStart },
+        status: LiveTradeStatus.CLOSED,
+      },
+      select: {
+        responsePayload: true,
+        errorMessage: true,
+      },
+    });
+
+    return closedTrades.reduce((total, trade) => {
+      const pnl = this.readPnL(trade.responsePayload);
+      return pnl < 0 ? total + Math.abs(pnl) : total;
+    }, 0);
+  }
+
+  private readPnL(value: Prisma.JsonValue | null): number {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return 0;
+    }
+    const payload = value as Record<string, unknown>;
+    const rawPnL = payload.pnl ?? payload.profit ?? payload.netPnL;
+    return typeof rawPnL === 'number' && Number.isFinite(rawPnL) ? rawPnL : 0;
   }
 }

@@ -18,26 +18,31 @@ export class BrokerController {
   }
 
   @Get('account')
+  @Roles(Role.ADMIN, Role.TRADER, Role.VIEWER)
   getAccountInfo() {
     return this.brokerService.getAccountInfo();
   }
 
   @Get('symbols')
+  @Roles(Role.ADMIN, Role.TRADER, Role.VIEWER)
   getSymbols() {
     return this.brokerService.getSymbols();
   }
 
   @Get('prices/:symbol')
+  @Roles(Role.ADMIN, Role.TRADER, Role.VIEWER)
   getPrice(@Param('symbol') symbol: string) {
     return this.brokerService.getPrice(symbol);
   }
 
   @Post('orders/dry-run')
+  @Roles(Role.ADMIN, Role.TRADER)
   dryRunOrder(@Body() dto: BrokerOrderDto) {
     return this.brokerService.dryRunOrder(dto);
   }
 
   @Post('orders/dry-run/from-signal')
+  @Roles(Role.ADMIN, Role.TRADER)
   dryRunOrderFromSignal(@Body() dto: DryRunFromSignalDto) {
     return this.brokerService.dryRunOrderFromSignal(dto.signalId);
   }
