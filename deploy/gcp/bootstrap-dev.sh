@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/common.sh"
 source "${SCRIPT_DIR}/dev.env"
 
 gcloud config set project "${PROJECT_ID}"
@@ -38,10 +39,13 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
 
 gcloud compute networks vpc-access connectors create "${VPC_CONNECTOR}" \
   --region="${REGION}" \
-  --range="10.8.0.0/28" || true
+  --range="${VPC_CONNECTOR_RANGE:-172.16.0.0/28}" \
+  --min-instances=2 \
+  --max-instances=3 || true
 
 gcloud sql instances create "${CLOUD_SQL_INSTANCE}" \
   --database-version=POSTGRES_16 \
+  --edition=ENTERPRISE \
   --tier="${CLOUD_SQL_TIER}" \
   --region="${REGION}" \
   --storage-size=10GB \

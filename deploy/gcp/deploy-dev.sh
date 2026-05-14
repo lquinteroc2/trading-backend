@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/common.sh"
 source "${SCRIPT_DIR}/dev.env"
 
 gcloud config set project "${PROJECT_ID}"
@@ -80,7 +81,7 @@ gcloud run deploy "${BACKEND_SERVICE}" \
   --vpc-connector="${VPC_CONNECTOR}" \
   --vpc-egress=private-ranges-only \
   --add-cloudsql-instances="${INSTANCE_CONNECTION_NAME}" \
-  --set-env-vars="NODE_ENV=production,PORT=3000,SKIP_PRISMA_MIGRATE=true,CORS_ORIGINS=${CORS_ORIGINS},COOKIE_SECURE=true,COOKIE_SAME_SITE=lax,REDIS_HOST=${REDIS_HOST},REDIS_PORT=6379,TECHNICAL_AGENT_BASE_URL=${TECHNICAL_AGENT_URL},TECHNICAL_AGENT_AUTH_AUDIENCE=${TECHNICAL_AGENT_URL},BROKER_PROVIDER=MT5,${MT5_ENV}" \
+  --set-env-vars="NODE_ENV=production,SKIP_PRISMA_MIGRATE=true,CORS_ORIGINS=${CORS_ORIGINS},COOKIE_SECURE=true,COOKIE_SAME_SITE=lax,REDIS_HOST=${REDIS_HOST},REDIS_PORT=6379,TECHNICAL_AGENT_BASE_URL=${TECHNICAL_AGENT_URL},TECHNICAL_AGENT_AUTH_AUDIENCE=${TECHNICAL_AGENT_URL},BROKER_PROVIDER=MT5,${MT5_ENV}" \
   --set-secrets="DATABASE_URL=trading-dev-database-url:latest,JWT_SECRET=trading-dev-jwt-secret:latest,JWT_REFRESH_SECRET=trading-dev-jwt-refresh-secret:latest${MT5_SECRETS}"
 
 echo "Backend URL:"

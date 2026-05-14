@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/common.sh"
 source "${SCRIPT_DIR}/dev.env"
 
 gcloud config set project "${PROJECT_ID}"
@@ -15,7 +16,7 @@ gcloud run jobs deploy "${JOB_NAME}" \
   --image="${REGISTRY}/trading-backend:dev" \
   --region="${REGION}" \
   --service-account="${BACKEND_SA_EMAIL}" \
-  --add-cloudsql-instances="${INSTANCE_CONNECTION_NAME}" \
+  --set-cloudsql-instances="${INSTANCE_CONNECTION_NAME}" \
   --set-secrets="DATABASE_URL=trading-dev-database-url:latest" \
   --command=npm \
   --args=run,prisma:deploy \

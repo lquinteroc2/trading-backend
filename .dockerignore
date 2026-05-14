@@ -2,6 +2,7 @@ node_modules
 dist
 .git
 .env
+deploy/gcp/dev.env
 coverage
 npm-debug.log
 Dockerfile
