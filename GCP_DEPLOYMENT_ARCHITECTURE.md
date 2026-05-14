@@ -424,6 +424,20 @@ Para cotizar, pedir precios mensuales aproximados para:
 
 ## Decision Recomendada Para Empezar
 
+Los scripts reproducibles para el ambiente dev viven en `deploy/gcp/`:
+
+```bash
+cp deploy/gcp/dev.env.example deploy/gcp/dev.env
+deploy/gcp/bootstrap-dev.sh
+deploy/gcp/build-images-dev.sh
+deploy/gcp/run-migrations-dev.sh
+deploy/gcp/deploy-dev.sh
+```
+
+Para MT5 real con opcion B, configurar `MT5_WORKER_BASE_URL` y `MT5_WORKER_API_KEY` en
+`deploy/gcp/dev.env`. Si `MT5_WORKER_BASE_URL` queda vacio, el deploy crea un worker MT5 dry-run
+privado en Cloud Run para pruebas de contrato.
+
 ### Dev inicial
 
 ```text

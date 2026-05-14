@@ -1,6 +1,7 @@
 import { BadGatewayException, Injectable, RequestTimeoutException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Timeframe } from '@prisma/client';
+import { getCloudRunIdentityToken } from '../../../common/http/google-cloud-run-auth';
 import {
   AnalyzeCandlesParams,
   TechnicalAnalysisProvider,
@@ -15,10 +16,12 @@ type WorkerTechnicalAnalysisResponse = Omit<TechnicalAnalysisResult, 'timeframe'
 @Injectable()
 export class PythonTechnicalAnalysisProvider implements TechnicalAnalysisProvider {
   private readonly baseUrl: string;
+  private readonly authAudience?: string;
   private readonly timeoutMs: number;
 
   constructor(private readonly config: ConfigService) {
     this.baseUrl = this.config.get<string>('technicalAgent.baseUrl') ?? 'http://localhost:8000';
+    this.authAudience = this.config.get<string>('technicalAgent.authAudience');
     this.timeoutMs = this.config.get<number>('technicalAgent.timeoutMs') ?? 8000;
   }
 
@@ -27,9 +30,14 @@ export class PythonTechnicalAnalysisProvider implements TechnicalAnalysisProvide
     const abortController = new AbortController();
     const timeout = setTimeout(() => abortController.abort(), this.timeoutMs);
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (this.authAudience) {
+        headers.Authorization = `Bearer ${await getCloudRunIdentityToken(this.authAudience)}`;
+      }
+
       response = await fetch(`${this.baseUrl}/technical-analysis/analyze`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         signal: abortController.signal,
         body: JSON.stringify({
           symbol: params.symbol,

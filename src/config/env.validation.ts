@@ -100,6 +100,10 @@ class EnvironmentVariables {
   TECHNICAL_AGENT_BASE_URL?: string;
 
   @IsOptional()
+  @IsString()
+  TECHNICAL_AGENT_AUTH_AUDIENCE?: string;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   TECHNICAL_ANALYSIS_MIN_CANDLES?: number;
@@ -228,6 +232,14 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   MT5_WORKER_BASE_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  MT5_WORKER_AUTH_AUDIENCE?: string;
+
+  @IsOptional()
+  @IsString()
+  MT5_WORKER_API_KEY?: string;
 
   @IsOptional()
   @IsString()

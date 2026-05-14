@@ -1,6 +1,10 @@
 #!/bin/sh
 set -e
 
+if [ "$SKIP_PRISMA_MIGRATE" = "true" ]; then
+  exec node dist/main.js
+fi
+
 attempt=1
 max_attempts=30
 

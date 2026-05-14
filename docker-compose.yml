@@ -36,10 +36,10 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${PORT:-3000}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://trading:trading@postgres:5432/trading?schema=public}
+      DATABASE_URL: ${BACKEND_DATABASE_URL:-postgresql://trading:trading@postgres:5432/trading?schema=public}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
-      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_HOST: ${BACKEND_REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@trading.local}

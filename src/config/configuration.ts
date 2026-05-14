@@ -38,6 +38,7 @@ export default () => ({
   },
   technicalAgent: {
     baseUrl: process.env.TECHNICAL_AGENT_BASE_URL ?? 'http://localhost:8000',
+    authAudience: process.env.TECHNICAL_AGENT_AUTH_AUDIENCE || undefined,
     minCandles: parseInt(process.env.TECHNICAL_ANALYSIS_MIN_CANDLES ?? '200', 10),
     defaultLimit: parseInt(
       process.env.TECHNICAL_ANALYSIS_DEFAULT_LIMIT ??
@@ -89,6 +90,8 @@ export default () => ({
   },
   mt5: {
     workerBaseUrl: process.env.MT5_WORKER_BASE_URL ?? 'http://localhost:8010',
+    workerAuthAudience: process.env.MT5_WORKER_AUTH_AUDIENCE || undefined,
+    workerApiKey: process.env.MT5_WORKER_API_KEY || undefined,
     dryRun: (process.env.MT5_DRY_RUN ?? 'true').toLowerCase() === 'true',
     requestTimeoutMs: parseInt(process.env.MT5_REQUEST_TIMEOUT_MS ?? '10000', 10),
   },

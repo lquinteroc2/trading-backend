@@ -29,11 +29,16 @@ pip install MetaTrader5
 ```bash
 ENABLE_LIVE_TRADING=false
 MT5_DRY_RUN=true
+MT5_WORKER_API_KEY=
 MT5_LOGIN=
 MT5_PASSWORD=
 MT5_SERVER=
 MT5_TERMINAL_PATH=
 ```
+
+Si `MT5_WORKER_API_KEY` tiene valor, todas las rutas salvo `/health` requieren el header
+`X-API-Key` con ese secreto. Usalo junto con HTTPS y firewall/IP allowlist cuando el worker viva en
+un VPS Windows externo.
 
 ## Limitacion Docker/macOS
 

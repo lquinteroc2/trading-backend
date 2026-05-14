@@ -1,5 +1,6 @@
 import { BadGatewayException, Injectable, RequestTimeoutException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { getCloudRunIdentityToken } from '../../../common/http/google-cloud-run-auth';
 import { IBrokerConnector } from '../domain/broker-connector.interface';
 import {
   BrokerAccountInfo,
@@ -14,10 +15,14 @@ import {
 @Injectable()
 export class Mt5BrokerConnector implements IBrokerConnector {
   private readonly baseUrl: string;
+  private readonly authAudience?: string;
+  private readonly apiKey?: string;
   private readonly timeoutMs: number;
 
   constructor(private readonly config: ConfigService) {
     this.baseUrl = this.config.get<string>('mt5.workerBaseUrl') ?? 'http://localhost:8010';
+    this.authAudience = this.config.get<string>('mt5.workerAuthAudience');
+    this.apiKey = this.config.get<string>('mt5.workerApiKey');
     this.timeoutMs = this.config.get<number>('mt5.requestTimeoutMs') ?? 10000;
   }
 
@@ -51,9 +56,20 @@ export class Mt5BrokerConnector implements IBrokerConnector {
     let response: Response;
 
     try {
+      const headers: Record<string, string> = {};
+      if (body) {
+        headers['Content-Type'] = 'application/json';
+      }
+      if (this.authAudience) {
+        headers.Authorization = `Bearer ${await getCloudRunIdentityToken(this.authAudience)}`;
+      }
+      if (this.apiKey) {
+        headers['X-API-Key'] = this.apiKey;
+      }
+
       response = await fetch(`${this.baseUrl}${path}`, {
         method,
-        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        headers: Object.keys(headers).length > 0 ? headers : undefined,
         body: body ? JSON.stringify(body) : undefined,
         signal: abortController.signal,
       });

@@ -12,11 +12,19 @@ class Settings(BaseSettings):
     mt5_server: Optional[str] = None
     mt5_terminal_path: Optional[str] = None
     mt5_dry_run: bool = True
+    mt5_worker_api_key: Optional[str] = None
     mt5_request_timeout_ms: int = 10000
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    @field_validator("mt5_login", "mt5_password", "mt5_server", "mt5_terminal_path", mode="before")
+    @field_validator(
+        "mt5_login",
+        "mt5_password",
+        "mt5_server",
+        "mt5_terminal_path",
+        "mt5_worker_api_key",
+        mode="before",
+    )
     @classmethod
     def blank_to_none(cls, value):
         if value == "":

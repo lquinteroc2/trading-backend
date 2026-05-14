@@ -75,7 +75,7 @@ El login devuelve `accessToken` y tambien setea cookies HTTP-only para integraci
 Minimas:
 
 ```env
-DATABASE_URL=postgresql://trading:trading@localhost:5432/trading?schema=public
+DATABASE_URL=postgresql://trading:trading@localhost:5433/trading?schema=public
 JWT_SECRET=change-me
 JWT_REFRESH_SECRET=change-me-too
 CORS_ORIGINS=http://localhost:3001
